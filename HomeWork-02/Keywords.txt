@@ -52,3 +52,24 @@ Security & Privacy for Drone Telecom
 #DroneZeroTrust
 #DroneIntrusionDetection
 #DronePrivacyPreservingAI
+
+#DroneNetworks
+#UAVNetworks
+#FlyingAdHocNetworks (#FANETs)
+#DroneCommunication
+#Drone5G
+#Drone6G
+#DroneEdgeComputing
+#DroneNetworkSlicing
+#DroneNetworkOrchestration
+#DroneAutonomy
+#AIforDrones
+#MLforDrones
+#DroneSecurity
+#DroneSpectrumManagement
+#DroneSwarm
+#DroneRouting
+#NetworkFunctionVirtualization
+#NFV
+#SoftwareDefinedNetworking
+#SDN
