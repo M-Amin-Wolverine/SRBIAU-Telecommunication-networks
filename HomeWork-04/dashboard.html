@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IPv6/NAT Iran Simulation Dashboard</title>
+    <!-- Tailwind CSS CDN for styling -->
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.min.js"></script>
+    <!-- Plotly CDN for embedding interactive plots -->
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <style>
+        body {
+            background-color: #1a202c;
+            color: #e2e8f0;
+            font-family: 'Inter', sans-serif;
+        }
+        .chart-container {
+            background: #2d3748;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        #realTimeStatus {
+            font-size: 0.9rem;
+            color: #a0aec0;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center p-6">
+    <h1 class="text-4xl font-bold mb-6 text-blue-400">Dual-Stack NAT Simulation Dashboard</h1>
+    <p class="text-lg mb-4">Real-time IPv4/IPv6 performance metrics for mixed NAT environments in Iran</p>
+    
+    <!-- Real-time Status -->
+    <div id="realTimeStatus" class="mb-6">Simulation Status: Waiting for data...</div>
+
+    <!-- Chart.js Latency Trends -->
+    <div class="chart-container w-full max-w-4xl mb-8">
+        <canvas id="latencyChart"></canvas>
+    </div>
+
+    <!-- Plotly Embed: Performance Trends -->
+    <div class="chart-container w-full max-w-4xl mb-8">
+        <h2 class="text-2xl font-semibold mb-4">Performance Trends</h2>
+        <div id="performanceTrends"></div>
+    </div>
+
+    <!-- Plotly Embed: Throughput Distribution -->
+    <div class="chart-container w-full max-w-4xl mb-8">
+        <h2 class="text-2xl font-semibold mb-4">Throughput Distribution</h2>
+        <div id="throughputDistribution"></div>
+    </div>
+
+    <!-- Fallback Static Image -->
+    <div class="chart-container w-full max-w-4xl mb-8">
+        <h2 class="text-2xl font-semibold mb-4">Fallback Latency Plot</h2>
+        <img src="simulation_results.png" alt="Latency Plot" class="w-full rounded-lg">
+    </div>
+
+    <!-- Links -->
+    <div class="flex space-x-4">
+        <a href="IPv4_IPv6_Dual_Stack_NAT_Iran.md" class="text-blue-400 hover:text-blue-300">Full Analysis (Markdown)</a>
+        <a href="simulation_results.csv" download class="text-blue-400 hover:text-blue-300">Download CSV Results</a>
+        <a href="simulation.log" download class="text-blue-400 hover:text-blue-300">Download Simulation Log</a>
+    </div>
+
+    <script>
+        // Fetch simulation results from CSV
+        async function loadSimulationData() {
+            try {
+                const response = await fetch('simulation_results.csv');
+                const csvText = await response.text();
+                const rows = csvText.split('\n').slice(1).filter(row => row);
+                const data = rows.map(row => {
+                    const [scenario, avg_latency_ms, avg_throughput_mbps, drop_rate, ipv6_efficiency_gain, traffic_type, cpu_usage, memory_usage_mb] = row.split(',');
+                    return {
+                        scenario: parseInt(scenario),
+                        avg_latency_ms: parseFloat(avg_latency_ms),
+                        avg_throughput_mbps: parseFloat(avg_throughput_mbps),
+                        drop_rate: parseFloat(drop_rate),
+                        traffic_type
+                    };
+                });
+                return data;
+            } catch (error) {
+                console.error('Error loading CSV:', error);
+                document.getElementById('realTimeStatus').innerText = 'Error loading simulation data';
+                return [];
+            }
+        }
+
+        // Initialize Chart.js Latency Trends
+        async function initLatencyChart() {
+            const data = await loadSimulationData();
+            if (!data.length) return;
+
+            const ctx = document.getElementById('latencyChart').getContext('2d');
+            const trafficTypes = [...new Set(data.map(d => d.traffic_type))];
+            const datasets = trafficTypes.map(type => ({
+                label: `${type} Latency`,
+                data: data.filter(d => d.traffic_type === type).map(d => d.avg_latency_ms),
+                borderColor: type === 'http' ? '#1f77b4' : type === 'video' ? '#ff7f0e' : '#d62728',
+                backgroundColor: type === 'http' ? 'rgba(31, 119, 180, 0.2)' : type === 'video' ? 'rgba(255, 127, 14, 0.2)' : 'rgba(214, 39, 40, 0.2)',
+                fill: true
+            }));
+
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.filter(d => d.traffic_type === trafficTypes[0]).map(d => d.scenario),
+                    datasets
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        title: { display: true, text: 'Latency Trends by Traffic Type', color: '#e2e8f0' },
+                        legend: { position: 'top', labels: { color: '#e2e8f0' } }
+                    },
+                    scales: {
+                        x: { title: { display: true, text: 'Scenario #', color: '#e2e8f0' }, ticks: { color: '#e2e8f0' } },
+                        y: { title: { display: true, text: 'Latency (ms)', color: '#e2e8f0' }, ticks: { color: '#e2e8f0' }, beginAtZero: true }
+                    }
+                }
+            });
+
+            document.getElementById('realTimeStatus').innerText = `Simulation Status: Loaded ${data.length} scenarios at ${new Date().toLocaleString()}`;
+        }
+
+        // Embed Plotly Visualizations
+        async function embedPlotlyPlots() {
+            try {
+                // Fetch performance trends
+                const perfResponse = await fetch('performance_trends.html');
+                const perfHtml = await perfResponse.text();
+                const perfDiv = document.createElement('div');
+                perfDiv.innerHTML = perfHtml.match(/<body[^>]*>([\s\S]*?)<\/body>/i)[1];
+                document.getElementById('performanceTrends').appendChild(perfDiv);
+
+                // Fetch throughput distribution
+                const throughputResponse = await fetch('throughput_distribution.html');
+                const throughputHtml = await throughputResponse.text();
+                const throughputDiv = document.createElement('div');
+                throughputDiv.innerHTML = throughputHtml.match(/<body[^>]*>([\s\S]*?)<\/body>/i)[1];
+                document.getElementById('throughputDistribution').appendChild(throughputDiv);
+            } catch (error) {
+                console.error('Error loading Plotly plots:', error);
+                document.getElementById('realTimeStatus').innerText = 'Error loading Plotly visualizations';
+            }
+        }
+
+        // Initialize dashboard
+        initLatencyChart();
+        embedPlotlyPlots();
+
+        // Real-time CSV polling (every 10 seconds)
+        setInterval(async () => {
+            await initLatencyChart();
+        }, 10000);
+    </script>
+</body>
+</html>
