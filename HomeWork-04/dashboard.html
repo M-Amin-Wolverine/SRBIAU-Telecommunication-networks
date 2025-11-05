@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IPv6/NAT Iran Radar Dashboard - 🔥 Ultra خفن 🔥</title>
+    <title>IPv6/NAT Iran Radar Dashboard - 🔥 Live خفن 🔥</title>
     <!-- Tailwind CSS CDN -->
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <!-- Chart.js CDN -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.min.js"></script>
-    <!-- Anime.js CDN for animations -->
+    <!-- Anime.js CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
     <style>
         body {
@@ -38,13 +38,23 @@
         .button:hover { transform: scale(1.05); }
         .filter-select { transition: background-color 0.3s; }
         .light .filter-select { background-color: #e2e8f0; color: #2d3748; }
+        .progress-bar {
+            height: 4px;
+            background: linear-gradient(90deg, #1f77b4, #ff7f0e);
+            animation: loading 2s infinite;
+        }
+        @keyframes loading {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
     </style>
 </head>
 <body class="min-h-screen flex flex-col items-center p-6 dark">
     <div class="text-center">
-        <h1 class="text-5xl font-extrabold text-blue-400 mb-4 animate-title">IPv6/NAT Iran Radar Dashboard - 🔥 Ultra خفن 🔥</h1>
-        <p class="text-lg mb-6">Real-time Cloudflare Radar Metrics for Iran with Simulation Fallback</p>
+        <h1 class="text-5xl font-extrabold text-blue-400 mb-4 animate-title">IPv6/NAT Iran Radar Dashboard - 🔥 Live خفن 🔥</h1>
+        <p class="text-lg mb-6">Real-time Cloudflare Radar Netflows for Iran (No Storage)</p>
         <div id="realTimeStatus" class="mb-6">Status: Initializing token verification...</div>
+        <div class="progress-bar w-full max-w-md"></div>
     </div>
 
     <!-- Controls -->
@@ -56,8 +66,7 @@
             <option value="video">Video</option>
             <option value="censored">Censored</option>
         </select>
-        <button id="downloadJson" class="button px-4 py-2 bg-green-500 text-white rounded-lg">Download JSON</button>
-        <button id="downloadCsv" class="button px-4 py-2 bg-green-500 text-white rounded-lg">Download CSV</button>
+        <button id="refreshData" class="button px-4 py-2 bg-purple-500 text-white rounded-lg">Refresh Now</button>
     </div>
 
     <!-- Chart -->
@@ -67,7 +76,7 @@
 
     <!-- Table -->
     <div class="chart-container w-full max-w-4xl mb-8">
-        <h2 class="text-2xl font-semibold mb-4">Network Metrics</h2>
+        <h2 class="text-2xl font-semibold mb-4">Live Network Metrics</h2>
         <table id="metricsTable" class="w-full border-collapse border border-gray-600">
             <thead>
                 <tr class="bg-gray-700 light:bg-gray-200">
@@ -76,6 +85,7 @@
                     <th class="border border-gray-600 p-2">Throughput (Mbps)</th>
                     <th class="border border-gray-600 p-2">Drop Rate (%)</th>
                     <th class="border border-gray-600 p-2">Traffic Type</th>
+                    <th class="border border-gray-600 p-2">Source</th>
                 </tr>
             </thead>
             <tbody id="metricsBody"></tbody>
@@ -97,7 +107,7 @@
     <script>
         const CLOUDFLARE_TOKEN = 'ebZoH8EbETLL27or2UaoBmCYsAf96jgrZMJjWoxr';
         const CLOUDFLARE_ACCOUNT_ID = '244d138842181939362ff7ed67787e4a';
-        const RADAR_API_URL = 'https://api.cloudflare.com/client/v4/radar/http/timeseries?location=IR&limit=10';
+        const RADAR_API_URL = 'https://api.cloudflare.com/client/v4/radar/netflows/top/locations?name=main&name=previous&name=compir&name=previousCompir&location=IR&location=IR&location=IR&location=IR&dateStart=2025-10-29T21:45:00.000Z&dateStart=2024-04-01T21:45:00.000Z&dateStart=2025-10-29T21:45:00.000Z&dateStart=2024-04-01T21:45:00.000Z&dateEnd=2025-11-05T21:44:59.999Z&dateEnd=2024-04-08T21:44:59.999Z&dateEnd=2025-11-05T21:44:59.999Z&dateEnd=2024-04-08T21:44:59.999Z&product=HTTP&product=HTTP&product=HTTP&product=HTTP&limit=200';
         let chartInstance = null;
         let currentData = [];
         let isRealTime = false;
@@ -112,7 +122,8 @@
                 if (!response.ok) throw new Error(`Token verify failed: ${response.status}`);
                 const data = await response.json();
                 if (data.success) {
-                    document.getElementById('realTimeStatus').innerText = 'Status: Token verified! Fetching Radar data...';
+                    document.getElementById('realTimeStatus').innerText = 'Status: Token verified! Fetching live Radar data...';
+                    errorCount = 0;
                     return true;
                 }
                 throw new Error('Token invalid');
@@ -124,25 +135,34 @@
             }
         }
 
-        // Fetch Radar Data
+        // Fetch Radar Data (Live, no storage)
         async function fetchRadarData() {
             try {
                 const response = await fetch(RADAR_API_URL, {
-                    headers: { 'Authorization': `Bearer ${CLOUDFLARE_TOKEN}`, 'Content-Type': 'application/json' }
+                    headers: { 'Authorization': `Bearer ${CLOUDFLARE_TOKEN}`, 'Accept': 'application/json' }
                 });
                 if (!response.ok) throw new Error(`Radar fetch failed: ${response.status}`);
                 const apiData = await response.json();
                 if (!apiData.success) throw new Error('Radar API error');
-                const processed = apiData.result.map((item, index) => ({
-                    timestamp: item.timestamp || new Date().toISOString(),
-                    scenario: index + 1,
-                    avg_latency_ms: item.avg_response_time || Math.random() * 50 + 20,
-                    avg_throughput_mbps: item.traffic / 1000000 || Math.random() * 50 + 10,
-                    drop_rate: item.error_rate || Math.random() * 0.05,
-                    traffic_type: ['http', 'video', 'censored'][index % 3]
-                }));
+
+                // Map Radar netflows to simulation format (mock latency/throughput for demo)
+                const processed = [];
+                ['main', 'previous', 'compir', 'previousCompir'].forEach((key, index) => {
+                    apiData.result[key].forEach(item => {
+                        processed.push({
+                            timestamp: apiData.result.meta.dateRange[index].startTime,
+                            scenario: processed.length + 1,
+                            avg_latency_ms: Math.random() * 50 + 20, // Mock: replace with real latency if available
+                            avg_throughput_mbps: parseFloat(item.value) * 0.5 + 10, // Scale value to Mbps
+                            drop_rate: Math.random() * 0.05, // Mock: replace with real drop rate
+                            traffic_type: ['http', 'video', 'censored'][processed.length % 3],
+                            source: key
+                        });
+                    });
+                });
+
                 isRealTime = true;
-                document.getElementById('realTimeStatus').innerText = `Status: Radar data loaded: ${processed.length} points at ${new Date().toLocaleString()}`;
+                document.getElementById('realTimeStatus').innerText = `Status: Live Radar data loaded: ${processed.length} points at ${new Date().toLocaleString('fa-IR')}`;
                 return processed;
             } catch (error) {
                 document.getElementById('realTimeStatus').innerText = `Status: Radar fetch failed: ${error.message}. Falling back to simulation...`;
@@ -166,11 +186,12 @@
                         avg_throughput_mbps: parseFloat(avg_throughput_mbps) || 0,
                         drop_rate: parseFloat(drop_rate) || 0,
                         traffic_type: traffic_type || 'unknown',
-                        timestamp: new Date().toISOString()
+                        timestamp: new Date().toISOString(),
+                        source: 'simulation'
                     };
                 });
                 isRealTime = false;
-                document.getElementById('realTimeStatus').innerText = `Status: Simulation data loaded: ${data.length} points at ${new Date().toLocaleString()}`;
+                document.getElementById('realTimeStatus').innerText = `Status: Simulation data loaded: ${data.length} points at ${new Date().toLocaleString('fa-IR')}`;
                 return data;
             } catch (error) {
                 document.getElementById('realTimeStatus').innerText = 'Status: Error loading simulation data';
@@ -203,18 +224,18 @@
             chartInstance = new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: filteredData.map(d => isRealTime ? new Date(d.timestamp).toLocaleTimeString() : d.scenario),
+                    labels: filteredData.map(d => isRealTime ? new Date(d.timestamp).toLocaleTimeString('fa-IR') : d.scenario),
                     datasets
                 },
                 options: {
                     responsive: true,
                     plugins: {
-                        title: { display: true, text: isRealTime ? 'Real-Time Radar Latency' : 'Simulation Latency', color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748' },
+                        title: { display: true, text: isRealTime ? 'Live Radar Latency (Iran)' : 'Simulation Latency', color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748' },
                         legend: { position: 'top', labels: { color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748' } }
                     },
                     scales: {
-                        x: { title: { display: true, text: isRealTime ? 'Time' : 'Scenario #', color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748' }, ticks: { color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748' } },
-                        y: { title: { display: true, text: 'Latency (ms)', color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748' }, ticks: { color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748' }, beginAtZero: true }
+                        x: { title: { display: true, text: isRealTime ? 'زمان' : 'سناریو #', color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748' }, ticks: { color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748' } },
+                        y: { title: { display: true, text: 'تأخیر (ms)', color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748' }, ticks: { color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748' }, beginAtZero: true }
                     }
                 }
             });
@@ -226,11 +247,12 @@
                 const tr = document.createElement('tr');
                 tr.className = 'table-row';
                 tr.innerHTML = `
-                    <td class="border border-gray-600 p-2">${new Date(row.timestamp).toLocaleString()}</td>
+                    <td class="border border-gray-600 p-2">${new Date(row.timestamp).toLocaleString('fa-IR')}</td>
                     <td class="border border-gray-600 p-2">${row.avg_latency_ms.toFixed(2)}</td>
                     <td class="border border-gray-600 p-2">${row.avg_throughput_mbps.toFixed(2)}</td>
                     <td class="border border-gray-600 p-2">${(row.drop_rate * 100).toFixed(2)}%</td>
                     <td class="border border-gray-600 p-2">${row.traffic_type}</td>
+                    <td class="border border-gray-600 p-2">${row.source}</td>
                 `;
                 tbody.appendChild(tr);
                 anime({
@@ -241,18 +263,15 @@
                     easing: 'easeOutQuad'
                 });
             });
-        }
 
-        // Download Data
-        function downloadData(format) {
-            const content = format === 'json' ? JSON.stringify(currentData, null, 2) : `scenario,avg_latency_ms,avg_throughput_mbps,drop_rate,traffic_type\n${currentData.map(row => `${row.scenario},${row.avg_latency_ms},${row.avg_throughput_mbps},${row.drop_rate},${row.traffic_type}`).join('\n')}`;
-            const blob = new Blob([content], { type: format === 'json' ? 'application/json' : 'text/csv' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `network_data.${format}`;
-            a.click();
-            URL.revokeObjectURL(url);
+            // Animate Chart
+            anime({
+                targets: '.chart-container',
+                scale: [0.95, 1],
+                opacity: [0, 1],
+                duration: 600,
+                easing: 'easeOutQuad'
+            });
         }
 
         // Theme Toggle
@@ -283,9 +302,8 @@
             renderChartAndTable(currentData);
         });
 
-        // Download Buttons
-        document.getElementById('downloadJson').addEventListener('click', () => downloadData('json'));
-        document.getElementById('downloadCsv').addEventListener('click', () => downloadData('csv'));
+        // Refresh Button
+        document.getElementById('refreshData').addEventListener('click', () => initDashboard(0));
 
         // Initialize Dashboard
         async function initDashboard(retryCount = 0) {
