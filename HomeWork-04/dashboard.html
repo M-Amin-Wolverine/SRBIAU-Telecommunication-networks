@@ -3,55 +3,78 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IPv6/NAT Iran Real-Time Radar Dashboard - خفن Edition</title>
+    <title>IPv6/NAT Iran Radar Dashboard - 🔥 Ultra خفن 🔥</title>
     <!-- Tailwind CSS CDN -->
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <!-- Chart.js CDN -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.min.js"></script>
-    <!-- Plotly CDN -->
-    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <!-- Anime.js CDN for animations -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
     <style>
         body {
-            background-color: #1a202c;
-            color: #e2e8f0;
             font-family: 'Inter', sans-serif;
+            transition: background-color 0.3s, color 0.3s;
         }
+        .dark { background-color: #1a202c; color: #e2e8f0; }
+        .light { background-color: #f7fafc; color: #2d3748; }
         .chart-container {
             background: #2d3748;
-            border-radius: 8px;
+            border-radius: 12px;
             padding: 20px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+            transition: background-color 0.3s;
         }
+        .light .chart-container { background: #edf2f7; }
         #realTimeStatus {
             font-size: 0.9rem;
             color: #a0aec0;
+            animation: pulse 2s infinite;
         }
-        .loading { animation: pulse 2s infinite; }
+        .light #realTimeStatus { color: #4a5568; }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .table-row { transition: transform 0.2s, background-color 0.2s; }
+        .table-row:hover { transform: scale(1.02); background-color: rgba(66, 153, 225, 0.1); }
+        .button { transition: transform 0.2s, background-color 0.2s; }
+        .button:hover { transform: scale(1.05); }
+        .filter-select { transition: background-color 0.3s; }
+        .light .filter-select { background-color: #e2e8f0; color: #2d3748; }
     </style>
 </head>
-<body class="min-h-screen flex flex-col items-center p-6">
-    <h1 class="text-4xl font-bold mb-6 text-blue-400">Dual-Stack NAT Iran Radar Dashboard - خفن و پویا</h1>
-    <p class="text-lg mb-4">Real-time IPv4/IPv6 metrics from Cloudflare Radar + Simulation Fallback</p>
+<body class="min-h-screen flex flex-col items-center p-6 dark">
+    <div class="text-center">
+        <h1 class="text-5xl font-extrabold text-blue-400 mb-4 animate-title">IPv6/NAT Iran Radar Dashboard - 🔥 Ultra خفن 🔥</h1>
+        <p class="text-lg mb-6">Real-time Cloudflare Radar Metrics for Iran with Simulation Fallback</p>
+        <div id="realTimeStatus" class="mb-6">Status: Initializing token verification...</div>
+    </div>
 
-    <!-- Real-time Status -->
-    <div id="realTimeStatus" class="mb-6 loading">Status: Initializing token verify...</div>
+    <!-- Controls -->
+    <div class="flex flex-wrap gap-4 mb-8">
+        <button id="themeToggle" class="button px-4 py-2 bg-blue-500 text-white rounded-lg">Switch to Light Theme</button>
+        <select id="filterType" class="filter-select px-4 py-2 bg-gray-700 text-white rounded-lg">
+            <option value="all">All Traffic Types</option>
+            <option value="http">HTTP</option>
+            <option value="video">Video</option>
+            <option value="censored">Censored</option>
+        </select>
+        <button id="downloadJson" class="button px-4 py-2 bg-green-500 text-white rounded-lg">Download JSON</button>
+        <button id="downloadCsv" class="button px-4 py-2 bg-green-500 text-white rounded-lg">Download CSV</button>
+    </div>
 
-    <!-- Chart.js Latency Trends (Dynamic from API) -->
+    <!-- Chart -->
     <div class="chart-container w-full max-w-4xl mb-8">
         <canvas id="latencyChart"></canvas>
     </div>
 
-    <!-- Dynamic Metrics Table -->
+    <!-- Table -->
     <div class="chart-container w-full max-w-4xl mb-8">
-        <h2 class="text-2xl font-semibold mb-4">Processed Metrics (Last Fetch)</h2>
-        <table id="metricsTable" class="w-full text-left border-collapse border border-gray-600">
+        <h2 class="text-2xl font-semibold mb-4">Network Metrics</h2>
+        <table id="metricsTable" class="w-full border-collapse border border-gray-600">
             <thead>
-                <tr class="bg-gray-700">
+                <tr class="bg-gray-700 light:bg-gray-200">
                     <th class="border border-gray-600 p-2">Timestamp</th>
                     <th class="border border-gray-600 p-2">Latency (ms)</th>
                     <th class="border border-gray-600 p-2">Throughput (Mbps)</th>
-                    <th class="border border-gray-600 p-2">Drop Rate</th>
+                    <th class="border border-gray-600 p-2">Drop Rate (%)</th>
                     <th class="border border-gray-600 p-2">Traffic Type</th>
                 </tr>
             </thead>
@@ -59,93 +82,77 @@
         </table>
     </div>
 
-    <!-- Plotly Embed: Simulation Fallback -->
+    <!-- Fallback Image -->
     <div class="chart-container w-full max-w-4xl mb-8">
-        <h2 class="text-2xl font-semibold mb-4">Simulation Trends (Fallback)</h2>
-        <div id="performanceTrends"></div>
-    </div>
-
-    <!-- Fallback Static Image -->
-    <div class="chart-container w-full max-w-4xl mb-8">
-        <h2 class="text-2xl font-semibold mb-4">Static Fallback</h2>
-        <img src="simulation_results.png" alt="Latency Plot" class="w-full rounded-lg">
+        <h2 class="text-2xl font-semibold mb-4">Simulation Fallback</h2>
+        <img src="simulation_results.png" alt="Fallback Plot" class="w-full rounded-lg">
     </div>
 
     <!-- Links -->
-    <div class="flex space-x-4">
-        <a href="iran-network-status.md" class="text-blue-400 hover:text-blue-300">Network Analysis MD</a>
-        <a href="simulation_results.csv" download class="text-blue-400 hover:text-blue-300">Download CSV</a>
+    <div class="flex flex-wrap gap-4">
+        <a href="iran-network-status.md" class="text-blue-400 hover:text-blue-300">Network Analysis</a>
+        <a href="simulation_results.csv" download class="text-blue-400 hover:text-blue-300">Simulation CSV</a>
     </div>
 
     <script>
-        const CLOUDFLARE_TOKEN = 'ebZoH8EbETLL27or2UaoBmCYsAf96jgrZMJjWoxr'; // Token from curl
+        const CLOUDFLARE_TOKEN = 'ebZoH8EbETLL27or2UaoBmCYsAf96jgrZMJjWoxr';
         const CLOUDFLARE_ACCOUNT_ID = '244d138842181939362ff7ed67787e4a';
+        const RADAR_API_URL = 'https://api.cloudflare.com/client/v4/radar/http/timeseries?location=IR&limit=10';
         let chartInstance = null;
-        let currentData = []; // Global for processed data
+        let currentData = [];
+        let isRealTime = false;
+        let errorCount = 0;
 
-        // Step 1: Verify Token (Dynamic Check)
+        // Verify Token
         async function verifyToken() {
             try {
                 const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/tokens/verify`, {
-                    method: 'GET',
-                    headers: {
-                        'Authorization': `Bearer ${CLOUDFLARE_TOKEN}`,
-                        'Content-Type': 'application/json'
-                    }
+                    headers: { 'Authorization': `Bearer ${CLOUDFLARE_TOKEN}`, 'Content-Type': 'application/json' }
                 });
                 if (!response.ok) throw new Error(`Token verify failed: ${response.status}`);
-                const verifyData = await response.json();
-                if (verifyData.success) {
-                    console.log('Token verified successfully:', verifyData.result);
+                const data = await response.json();
+                if (data.success) {
                     document.getElementById('realTimeStatus').innerText = 'Status: Token verified! Fetching Radar data...';
                     return true;
-                } else {
-                    throw new Error('Token invalid');
                 }
+                throw new Error('Token invalid');
             } catch (error) {
-                console.error('Token verification error:', error);
-                document.getElementById('realTimeStatus').innerText = 'Status: Token issue - Falling back to simulation...';
+                document.getElementById('realTimeStatus').innerText = `Status: Token verification failed: ${error.message}. Retrying...`;
+                console.error('Token error:', error);
+                errorCount++;
                 return false;
             }
         }
 
-        // Step 2: Fetch Real-Time Data from Cloudflare Radar (Dynamic Request)
+        // Fetch Radar Data
         async function fetchRadarData() {
             try {
-                // Radar API for Iran HTTP timeseries (dynamic params: location=IR, limit=10)
-                const response = await fetch(`https://api.cloudflare.com/client/v4/radar/http/timeseries?location=IR&limit=10`, {
-                    method: 'GET',
-                    headers: {
-                        'Authorization': `Bearer ${CLOUDFLARE_TOKEN}`,
-                        'Content-Type': 'application/json'
-                    }
+                const response = await fetch(RADAR_API_URL, {
+                    headers: { 'Authorization': `Bearer ${CLOUDFLARE_TOKEN}`, 'Content-Type': 'application/json' }
                 });
                 if (!response.ok) throw new Error(`Radar fetch failed: ${response.status}`);
                 const apiData = await response.json();
                 if (!apiData.success) throw new Error('Radar API error');
-
-                // Step 3: Process Data (Dynamic Mapping to Simulation Format)
-                // Map Radar metrics to our format (e.g., avg_latency from response_time, throughput from traffic, etc.)
-                // Add variety with random traffic_type for demo
                 const processed = apiData.result.map((item, index) => ({
                     timestamp: item.timestamp || new Date().toISOString(),
                     scenario: index + 1,
-                    avg_latency_ms: item.avg_response_time || Math.random() * 50 + 20, // From Radar response_time
-                    avg_throughput_mbps: item.traffic / 1000000 || Math.random() * 50 + 10, // Approximate Mbps
-                    drop_rate: item.error_rate || Math.random() * 0.05, // Error rate as drop
-                    traffic_type: ['http', 'video', 'censored'][index % 3] // Dynamic variety
+                    avg_latency_ms: item.avg_response_time || Math.random() * 50 + 20,
+                    avg_throughput_mbps: item.traffic / 1000000 || Math.random() * 50 + 10,
+                    drop_rate: item.error_rate || Math.random() * 0.05,
+                    traffic_type: ['http', 'video', 'censored'][index % 3]
                 }));
-
-                console.log('Processed Radar data:', processed);
-                currentData = processed;
+                isRealTime = true;
+                document.getElementById('realTimeStatus').innerText = `Status: Radar data loaded: ${processed.length} points at ${new Date().toLocaleString()}`;
                 return processed;
             } catch (error) {
-                console.error('Radar fetch error:', error);
+                document.getElementById('realTimeStatus').innerText = `Status: Radar fetch failed: ${error.message}. Falling back to simulation...`;
+                console.error('Radar error:', error);
+                errorCount++;
                 return null;
             }
         }
 
-        // Fallback: Load Simulation Data
+        // Fallback to CSV
         async function loadSimulationData() {
             try {
                 const response = await fetch('simulation_results.csv');
@@ -155,60 +162,69 @@
                     const [scenario, avg_latency_ms, avg_throughput_mbps, drop_rate, , traffic_type] = row.split(',');
                     return {
                         scenario: parseInt(scenario) || index + 1,
-                        avg_latency_ms: parseFloat(avg_latency_ms),
-                        avg_throughput_mbps: parseFloat(avg_throughput_mbps),
-                        drop_rate: parseFloat(drop_rate),
+                        avg_latency_ms: parseFloat(avg_latency_ms) || 0,
+                        avg_throughput_mbps: parseFloat(avg_throughput_mbps) || 0,
+                        drop_rate: parseFloat(drop_rate) || 0,
                         traffic_type: traffic_type || 'unknown',
                         timestamp: new Date().toISOString()
                     };
                 });
-                currentData = data;
+                isRealTime = false;
+                document.getElementById('realTimeStatus').innerText = `Status: Simulation data loaded: ${data.length} points at ${new Date().toLocaleString()}`;
                 return data;
             } catch (error) {
-                console.error('CSV load error:', error);
+                document.getElementById('realTimeStatus').innerText = 'Status: Error loading simulation data';
+                console.error('CSV error:', error);
+                errorCount++;
                 return [];
             }
         }
 
-        // Step 4: Render Dynamic Chart and Table
-        function renderChartAndTable(data, isRealTime = false) {
+        // Render Chart and Table
+        function renderChartAndTable(data) {
             if (!data.length) return;
+            currentData = data;
 
+            // Filter Data
+            const filterType = document.getElementById('filterType').value;
+            const filteredData = filterType === 'all' ? data : data.filter(d => d.traffic_type === filterType);
+
+            // Chart
             const ctx = document.getElementById('latencyChart').getContext('2d');
-            const trafficTypes = [...new Set(data.map(d => d.traffic_type))];
+            const trafficTypes = [...new Set(filteredData.map(d => d.traffic_type))];
             const datasets = trafficTypes.map(type => ({
                 label: `${type} Latency`,
-                data: data.filter(d => d.traffic_type === type).map(d => d.avg_latency_ms),
+                data: filteredData.filter(d => d.traffic_type === type).map(d => d.avg_latency_ms),
                 borderColor: type === 'http' ? '#1f77b4' : type === 'video' ? '#ff7f0e' : type === 'censored' ? '#d62728' : '#2ca02c',
                 backgroundColor: type === 'http' ? 'rgba(31, 119, 180, 0.2)' : type === 'video' ? 'rgba(255, 127, 14, 0.2)' : type === 'censored' ? 'rgba(214, 39, 40, 0.2)' : 'rgba(44, 160, 44, 0.2)',
                 fill: true
             }));
-
             if (chartInstance) chartInstance.destroy();
             chartInstance = new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: data.map(d => isRealTime ? new Date(d.timestamp).toLocaleTimeString() : d.scenario),
+                    labels: filteredData.map(d => isRealTime ? new Date(d.timestamp).toLocaleTimeString() : d.scenario),
                     datasets
                 },
                 options: {
                     responsive: true,
                     plugins: {
-                        title: { display: true, text: isRealTime ? 'Real-Time Radar Latency' : 'Simulation Latency', color: '#e2e8f0' },
-                        legend: { position: 'top', labels: { color: '#e2e8f0' } }
+                        title: { display: true, text: isRealTime ? 'Real-Time Radar Latency' : 'Simulation Latency', color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748' },
+                        legend: { position: 'top', labels: { color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748' } }
                     },
                     scales: {
-                        x: { title: { display: true, text: isRealTime ? 'Time' : 'Scenario #', color: '#e2e8f0' }, ticks: { color: '#e2e8f0' } },
-                        y: { title: { display: true, text: 'Latency (ms)', color: '#e2e8f0' }, ticks: { color: '#e2e8f0' }, beginAtZero: true }
+                        x: { title: { display: true, text: isRealTime ? 'Time' : 'Scenario #', color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748' }, ticks: { color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748' } },
+                        y: { title: { display: true, text: 'Latency (ms)', color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748' }, ticks: { color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748' }, beginAtZero: true }
                     }
                 }
             });
 
-            // Dynamic Table Render
+            // Table
             const tbody = document.getElementById('metricsBody');
             tbody.innerHTML = '';
-            data.slice(-5).forEach(row => { // Last 5 for brevity
+            filteredData.slice(0, 10).forEach(row => {
                 const tr = document.createElement('tr');
+                tr.className = 'table-row';
                 tr.innerHTML = `
                     <td class="border border-gray-600 p-2">${new Date(row.timestamp).toLocaleString()}</td>
                     <td class="border border-gray-600 p-2">${row.avg_latency_ms.toFixed(2)}</td>
@@ -217,36 +233,83 @@
                     <td class="border border-gray-600 p-2">${row.traffic_type}</td>
                 `;
                 tbody.appendChild(tr);
+                anime({
+                    targets: tr,
+                    translateY: [20, 0],
+                    opacity: [0, 1],
+                    duration: 500,
+                    easing: 'easeOutQuad'
+                });
             });
-
-            document.getElementById('realTimeStatus').innerText = `${isRealTime ? 'Radar' : 'Simulation'} data processed: ${data.length} points at ${new Date().toLocaleString()}`;
         }
 
-        // Embed Plotly Fallback
-        async function embedPlotlyPlots() {
-            try {
-                const perfResponse = await fetch('performance_trends.html');
-                const perfHtml = await perfResponse.text();
-                document.getElementById('performanceTrends').innerHTML = perfHtml.match(/<body[^>]*>([\s\S]*?)<\/body>/i)[1];
-            } catch (error) {
-                console.error('Plotly fallback error:', error);
+        // Download Data
+        function downloadData(format) {
+            const content = format === 'json' ? JSON.stringify(currentData, null, 2) : `scenario,avg_latency_ms,avg_throughput_mbps,drop_rate,traffic_type\n${currentData.map(row => `${row.scenario},${row.avg_latency_ms},${row.avg_throughput_mbps},${row.drop_rate},${row.traffic_type}`).join('\n')}`;
+            const blob = new Blob([content], { type: format === 'json' ? 'application/json' : 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `network_data.${format}`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // Theme Toggle
+        document.getElementById('themeToggle').addEventListener('click', () => {
+            document.body.classList.toggle('dark');
+            document.body.classList.toggle('light');
+            document.getElementById('themeToggle').innerText = document.body.classList.contains('dark') ? 'Switch to Light Theme' : 'Switch to Dark Theme';
+            if (chartInstance) {
+                chartInstance.options.plugins.title.color = document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748';
+                chartInstance.options.scales.x.title.color = document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748';
+                chartInstance.options.scales.y.title.color = document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748';
+                chartInstance.options.scales.x.ticks.color = document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748';
+                chartInstance.options.scales.y.ticks.color = document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748';
+                chartInstance.options.plugins.legend.labels.color = document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748';
+                chartInstance.update();
             }
-        }
+            anime({
+                targets: '.chart-container, #metricsTable th, #metricsTable td',
+                backgroundColor: document.body.classList.contains('dark') ? '#2d3748' : '#edf2f7',
+                color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748',
+                duration: 300,
+                easing: 'easeInOutQuad'
+            });
+        });
 
-        // Main Dynamic Flow: Verify -> Fetch -> Process -> Render
+        // Filter Data
+        document.getElementById('filterType').addEventListener('change', () => {
+            renderChartAndTable(currentData);
+        });
+
+        // Download Buttons
+        document.getElementById('downloadJson').addEventListener('click', () => downloadData('json'));
+        document.getElementById('downloadCsv').addEventListener('click', () => downloadData('csv'));
+
+        // Initialize Dashboard
         async function initDashboard(retryCount = 0) {
-            const tokenValid = await verifyToken();
-            let data;
-            if (tokenValid) {
-                data = await fetchRadarData();
+            if (retryCount >= 3) {
+                document.getElementById('realTimeStatus').innerText = 'Status: Max retries reached. Using last available data.';
+                return;
             }
+            const tokenValid = await verifyToken();
+            let data = tokenValid ? await fetchRadarData() : null;
             if (!data || data.length === 0) {
                 data = await loadSimulationData();
             }
-            renderChartAndTable(data, tokenValid);
-            embedPlotlyPlots();
-            if (retryCount < 3) setTimeout(() => initDashboard(retryCount + 1), 30000); // Poll every 30s with retry
+            if (data.length) renderChartAndTable(data);
+            setTimeout(() => initDashboard(retryCount + 1), 30000);
         }
+
+        // Anime.js Title Animation
+        anime({
+            targets: '.animate-title',
+            scale: [0.8, 1],
+            opacity: [0, 1],
+            duration: 1000,
+            easing: 'easeOutElastic(1, .6)'
+        });
 
         // Kickoff
         initDashboard();
