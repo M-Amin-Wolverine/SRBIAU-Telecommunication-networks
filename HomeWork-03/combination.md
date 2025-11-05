@@ -582,7 +582,7 @@ Welcome to this curated collection of cutting-edge research papers focusing on *
 Feel free to explore these papers and their projects! If you have more resources or want to contribute to this collection, open an issue or PR on this repo. Let’s advance telecom and drone tech together! 🚀  
 #Telecom #Drones #AI #Blockchain #6G #Security
 
-##Notes:
+### Notes:
 
 - Raw URLs: All links are provided as plain text URLs (e.g., https://arxiv.org/pdf/2505.24051.pdf) instead of clickable Markdown links ([PDF](...)), per your request.
 - Markdown Format: Strictly formatted for GitHub compatibility (.md); tested for rendering with proper headings, lists, and code blocks.
