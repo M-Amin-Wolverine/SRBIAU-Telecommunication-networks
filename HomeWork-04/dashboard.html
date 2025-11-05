@@ -88,7 +88,7 @@
     <div class="text-center">
         <h1 class="text-5xl font-extrabold text-blue-400 mb-4 animate-title">Iran IPv6/NAT Radar Dashboard - 🔥 Real-Time Epic 🔥</h1>
         <p class="text-lg mb-6">Real-time Iran network data from Cloudflare Radar (no storage)</p>
-        <div id="realTimeStatus" class="mb-6" role="status" aria-live="polite">Status: Verifying token...</div>
+        <div id="realTimeStatus" class="mb-6" role="status" aria-live="polite">Status: Initializing...</div>
         <div class="progress-bar w-full max-w-md"></div>
     </div>
     <!-- Controls -->
@@ -127,97 +127,10 @@
             <tbody id="metricsBody"></tbody>
         </table>
     </div>
-    <!-- Fallback Image -->
-    <div class="chart-container w-full max-w-4xl mb-8" role="region" aria-label="Simulation fallback">
-        <h2 class="text-2xl font-semibold mb-4">Simulation Fallback</h2>
-        <!-- Fallback Chart Section -->
-<div class="chart-container w-full max-w-4xl mb-8" role="region" aria-label="Simulation fallback chart">
-    <h2 class="text-2xl font-semibold mb-4">Simulation Fallback Chart</h2>
-    <canvas id="simulationChart" aria-label="Simulation data chart"></canvas>
-</div>
-
-<script>
-// Ensure PapaParse is included in your <head> for CSV parsing
-// <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
-
-// Add this to your existing JavaScript
-async function loadAndRenderSimulationChart() {
-    try {
-        const response = await fetch('simulation_results.csv');
-        if (!response.ok) throw new Error(`Failed to load CSV: ${response.status}`);
-        const csvText = await response.text();
-        const parsed = Papa.parse(csvText, { header: true, skipEmptyLines: true });
-        const data = parsed.data.map((row, index) => ({
-            scenario: parseInt(row.scenario) || index + 1,
-            avg_latency_ms: parseFloat(row.avg_latency_ms) || 0,
-            avg_throughput_mbps: parseFloat(row.avg_throughput_mbps) || 0,
-            drop_rate: parseFloat(row.drop_rate) || 0,
-            source: 'simulation',
-            timestamp: row.timestamp || new Date().toISOString()
-        }));
-
-        // Render Chart
-        const ctx = document.getElementById('simulationChart').getContext('2d');
-        new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: data.map(d => `Scenario ${d.scenario}`),
-                datasets: [
-                    {
-                        label: 'Simulation Throughput',
-                        data: data.map(d => d.avg_throughput_mbps),
-                        borderColor: '#9467bd',
-                        backgroundColor: 'rgba(148, 103, 189, 0.2)',
-                        fill: true,
-                        tension: 0.4,
-                        pointRadius: 5,
-                        pointHoverRadius: 8
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                plugins: {
-                    title: {
-                        display: true,
-                        text: 'Simulation Throughput',
-                        color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748',
-                        font: { size: 18 }
-                    },
-                    legend: {
-                        position: 'top',
-                        labels: { color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748' }
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: (context) => `${context.dataset.label}: ${context.raw.toFixed(2)} Mbps`
-                        }
-                    }
-                },
-                scales: {
-                    x: {
-                        title: { display: true, text: 'Scenario #', color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748' },
-                        ticks: { color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748', maxRotation: 45, minRotation: 45 }
-                    },
-                    y: {
-                        title: { display: true, text: 'Throughput (Mbps)', color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748' },
-                        ticks: { color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748' },
-                        beginAtZero: true
-                    }
-                }
-            }
-        });
-
-        document.getElementById('realTimeStatus').innerText = `Status: Simulation chart loaded with ${data.length} points at ${new Date().toLocaleString('en-US')}`;
-    } catch (error) {
-        document.getElementById('realTimeStatus').innerText = `Status: Failed to load simulation CSV: ${error.message}`;
-        console.error('Simulation CSV error:', error);
-    }
-}
-
-// Call this function in your initDashboard or as needed
-loadAndRenderSimulationChart();
-</script>
+    <!-- Simulation Chart Section -->
+    <div class="chart-container w-full max-w-4xl mb-8" role="region" aria-label="Simulation fallback chart">
+        <h2 class="text-2xl font-semibold mb-4">Simulation Fallback Chart</h2>
+        <canvas id="simulationChart" aria-label="Simulation data chart"></canvas>
     </div>
     <!-- Modal for Errors -->
     <div id="errorModal" class="modal">
@@ -238,12 +151,23 @@ loadAndRenderSimulationChart();
         const CLOUDFLARE_ACCOUNT_ID = '244d138842181939362ff7ed67787e4a';
         const RADAR_API_URL = 'https://api.cloudflare.com/client/v4/radar/netflows/top/locations?name=main&name=previous&name=compir&name=previousCompir&location=IR&dateStart=2025-10-29T00:00:00.000Z&dateStart=2025-10-22T00:00:00.000Z&dateStart=2025-10-29T00:00:00.000Z&dateStart=2025-10-22T00:00:00.000Z&dateEnd=2025-11-05T11:36:00.000Z&dateEnd=2025-10-29T00:00:00.000Z&dateEnd=2025-11-05T11:36:00.000Z&dateEnd=2025-10-29T00:00:00.000Z&product=HTTP&limit=200';
         const FALLBACK_JSON_URL = 'radar_data.json';
-        const WEBSOCKET_URL = 'wss://radar-ws.example.com'; // Placeholder for real WebSocket
+        // const WEBSOCKET_URL = 'wss://radar-ws.example.com'; // Disabled: Placeholder URL
         let chartInstance = null;
+        let simulationChartInstance = null;
         let currentData = [];
         let isRealTime = false;
         let errorCount = 0;
-        let ws = null;
+        // let ws = null; // Disabled WebSocket
+
+        // Mock Data Fallback
+        const mockData = Array.from({ length: 10 }, (_, i) => ({
+            timestamp: new Date(Date.now() - i * 3600000).toISOString(),
+            scenario: i + 1,
+            avg_latency_ms: Math.random() * 50 + 20,
+            avg_throughput_mbps: Math.random() * 100 + 10,
+            drop_rate: Math.random() * 0.05,
+            source: 'mock'
+        }));
 
         // Utility Functions
         function showError(message) {
@@ -258,6 +182,10 @@ loadAndRenderSimulationChart();
         }
 
         function exportToCsv(data) {
+            if (!data.length) {
+                showError('No data available to export.');
+                return;
+            }
             const headers = ['Timestamp', 'Scenario', 'Throughput (Mbps)', 'Latency (ms)', 'Drop Rate (%)', 'Source'];
             const csv = Papa.unparse({
                 fields: headers,
@@ -311,16 +239,18 @@ loadAndRenderSimulationChart();
                 if (!apiData.success) throw new Error('Radar API error: ' + (apiData.errors[0]?.message || 'Unknown error'));
                 const processed = [];
                 ['main', 'previous', 'compir', 'previousCompir'].forEach((key, index) => {
-                    apiData.result[key].forEach(item => {
-                        processed.push({
-                            timestamp: apiData.result.meta.dateRange[index].startTime,
-                            scenario: processed.length + 1,
-                            avg_latency_ms: Math.random() * 50 + 20, // Mock: replace with real latency
-                            avg_throughput_mbps: parseFloat(item.value) * 0.5 + 10,
-                            drop_rate: Math.random() * 0.05,
-                            source: key
+                    if (apiData.result[key]) {
+                        apiData.result[key].forEach(item => {
+                            processed.push({
+                                timestamp: apiData.result.meta.dateRange[index]?.startTime || new Date().toISOString(),
+                                scenario: processed.length + 1,
+                                avg_latency_ms: Math.random() * 50 + 20, // Mock: replace with real latency if available
+                                avg_throughput_mbps: parseFloat(item.value) * 0.5 + 10,
+                                drop_rate: Math.random() * 0.05,
+                                source: key
+                            });
                         });
-                    });
+                    }
                 });
                 isRealTime = true;
                 document.getElementById('realTimeStatus').innerText = `Status: Real-time Radar data loaded: ${processed.length} points at ${new Date().toLocaleString('en-US')}`;
@@ -334,55 +264,27 @@ loadAndRenderSimulationChart();
             }
         }
 
-        // WebSocket for Real-Time Updates
-        function initWebSocket() {
-            ws = new WebSocket(WEBSOCKET_URL);
-            ws.onopen = () => {
-                document.getElementById('realTimeStatus').innerText = 'Status: WebSocket connected! Receiving live updates...';
-            };
-            ws.onmessage = async (event) => {
-                try {
-                    const newData = JSON.parse(event.data);
-                    currentData.push(...newData.map((item, index) => ({
-                        timestamp: new Date().toISOString(),
-                        scenario: currentData.length + index + 1,
-                        avg_latency_ms: item.latency || Math.random() * 50 + 20,
-                        avg_throughput_mbps: item.throughput || Math.random() * 100 + 10,
-                        drop_rate: item.dropRate || Math.random() * 0.05,
-                        source: 'live'
-                    })));
-                    renderChartAndTable(currentData);
-                } catch (error) {
-                    console.error('WebSocket data error:', error);
-                }
-            };
-            ws.onclose = () => {
-                document.getElementById('realTimeStatus').innerText = 'Status: WebSocket disconnected. Reconnecting...';
-                setTimeout(initWebSocket, 5000);
-            };
-            ws.onerror = (error) => {
-                console.error('WebSocket error:', error);
-            };
-        }
-
         // Fallback to Local JSON
         async function fetchLocalJson() {
             try {
                 const response = await fetch(FALLBACK_JSON_URL);
+                if (!response.ok) throw new Error(`Local JSON fetch failed: ${response.status}`);
                 const apiData = await response.json();
                 if (!apiData.success) throw new Error('Local JSON error');
                 const processed = [];
                 ['main', 'previous', 'compir', 'previousCompir'].forEach((key, index) => {
-                    apiData.result[key].forEach(item => {
-                        processed.push({
-                            timestamp: apiData.result.meta.dateRange[index].startTime,
-                            scenario: processed.length + 1,
-                            avg_latency_ms: Math.random() * 50 + 20,
-                            avg_throughput_mbps: parseFloat(item.value) * 0.5 + 10,
-                            drop_rate: Math.random() * 0.05,
-                            source: key
+                    if (apiData.result[key]) {
+                        apiData.result[key].forEach(item => {
+                            processed.push({
+                                timestamp: apiData.result.meta.dateRange[index]?.startTime || new Date().toISOString(),
+                                scenario: processed.length + 1,
+                                avg_latency_ms: Math.random() * 50 + 20,
+                                avg_throughput_mbps: parseFloat(item.value) * 0.5 + 10,
+                                drop_rate: Math.random() * 0.05,
+                                source: key
+                            });
                         });
-                    });
+                    }
                 });
                 isRealTime = false;
                 document.getElementById('realTimeStatus').innerText = `Status: Local JSON data loaded: ${processed.length} points at ${new Date().toLocaleString('en-US')}`;
@@ -395,58 +297,185 @@ loadAndRenderSimulationChart();
             }
         }
 
-        // Fallback to CSV
+        // Load Simulation Data
         async function loadSimulationData() {
             try {
                 const response = await fetch('simulation_results.csv');
+                if (!response.ok) throw new Error(`Simulation CSV fetch failed: ${response.status}`);
                 const csvText = await response.text();
                 const parsed = Papa.parse(csvText, { header: true, skipEmptyLines: true });
                 const data = parsed.data.map((row, index) => ({
                     scenario: parseInt(row.scenario) || index + 1,
-                    avg_latency_ms: parseFloat(row.avg_latency_ms) || 0,
-                    avg_throughput_mbps: parseFloat(row.avg_throughput_mbps) || 0,
-                    drop_rate: parseFloat(row.drop_rate) || 0,
+                    avg_latency_ms: parseFloat(row.avg_latency_ms) || Math.random() * 50 + 20,
+                    avg_throughput_mbps: parseFloat(row.avg_throughput_mbps) || Math.random() * 100 + 10,
+                    drop_rate: parseFloat(row.drop_rate) || Math.random() * 0.05,
                     source: 'simulation',
-                    timestamp: new Date().toISOString()
+                    timestamp: row.timestamp || new Date().toISOString()
                 }));
                 isRealTime = false;
                 document.getElementById('realTimeStatus').innerText = `Status: Simulation data loaded: ${data.length} points at ${new Date().toLocaleString('en-US')}`;
                 return data;
             } catch (error) {
-                document.getElementById('realTimeStatus').innerText = 'Status: Simulation data load failed';
+                document.getElementById('realTimeStatus').innerText = `Status: Simulation data load failed: ${error.message}. Using mock data...`;
                 console.error('CSV error:', error);
-                showError('Simulation data load failed');
+                showError(`Simulation data load failed: ${error.message}`);
                 errorCount++;
-                return [];
+                return mockData; // Fallback to mock data
             }
         }
 
-        // Render Chart and Table
-        function renderChartAndTable(data) {
-            if (!data.length) return;
-            currentData = data;
+        // Render Simulation Chart
+        async function loadAndRenderSimulationChart() {
+            try {
+                const response = await fetch('simulation_results.csv');
+                if (!response.ok) throw new Error(`Simulation CSV fetch failed: ${response.status}`);
+                const csvText = await response.text();
+                const parsed = Papa.parse(csvText, { header: true, skipEmptyLines: true });
+                const data = parsed.data.map((row, index) => ({
+                    scenario: parseInt(row.scenario) || index + 1,
+                    avg_latency_ms: parseFloat(row.avg_latency_ms) || Math.random() * 50 + 20,
+                    avg_throughput_mbps: parseFloat(row.avg_throughput_mbps) || Math.random() * 100 + 10,
+                    drop_rate: parseFloat(row.drop_rate) || Math.random() * 0.05,
+                    source: 'simulation',
+                    timestamp: row.timestamp || new Date().toISOString()
+                }));
 
+                const ctx = document.getElementById('simulationChart').getContext('2d');
+                if (simulationChartInstance) simulationChartInstance.destroy();
+                simulationChartInstance = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: data.map(d => `Scenario ${d.scenario}`),
+                        datasets: [
+                            {
+                                label: 'Simulation Throughput',
+                                data: data.map(d => d.avg_throughput_mbps),
+                                borderColor: '#9467bd',
+                                backgroundColor: 'rgba(148, 103, 189, 0.2)',
+                                fill: true,
+                                tension: 0.4,
+                                pointRadius: 5,
+                                pointHoverRadius: 8
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'Simulation Throughput',
+                                color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748',
+                                font: { size: 18 }
+                            },
+                            legend: {
+                                position: 'top',
+                                labels: { color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748' }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: (context) => `${context.dataset.label}: ${context.raw.toFixed(2)} Mbps`
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                title: { display: true, text: 'Scenario #', color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748' },
+                                ticks: { color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748', maxRotation: 45, minRotation: 45 }
+                            },
+                            y: {
+                                title: { display: true, text: 'Throughput (Mbps)', color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748' },
+                                ticks: { color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748' },
+                                beginAtZero: true
+                            }
+                        }
+                    }
+                });
+                document.getElementById('realTimeStatus').innerText = `Status: Simulation chart loaded with ${data.length} points at ${new Date().toLocaleString('en-US')}`;
+            } catch (error) {
+                document.getElementById('realTimeStatus').innerText = `Status: Failed to load simulation CSV: ${error.message}. Using mock data...`;
+                console.error('Simulation CSV error:', error);
+                showError(`Failed to load simulation CSV: ${error.message}`);
+                // Render mock data as fallback
+                const ctx = document.getElementById('simulationChart').getContext('2d');
+                if (simulationChartInstance) simulationChartInstance.destroy();
+                simulationChartInstance = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: mockData.map(d => `Scenario ${d.scenario}`),
+                        datasets: [
+                            {
+                                label: 'Mock Simulation Throughput',
+                                data: mockData.map(d => d.avg_throughput_mbps),
+                                borderColor: '#9467bd',
+                                backgroundColor: 'rgba(148, 103, 189, 0.2)',
+                                fill: true,
+                                tension: 0.4,
+                                pointRadius: 5,
+                                pointHoverRadius: 8
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'Mock Simulation Throughput',
+                                color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748',
+                                font: { size: 18 }
+                            },
+                            legend: {
+                                position: 'top',
+                                labels: { color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748' }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: (context) => `${context.dataset.label}: ${context.raw.toFixed(2)} Mbps`
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                title: { display: true, text: 'Scenario #', color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748' },
+                                ticks: { color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748', maxRotation: 45, minRotation: 45 }
+                            },
+                            y: {
+                                title: { display: true, text: 'Throughput (Mbps)', color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748' },
+                                ticks: { color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748' },
+                                beginAtZero: true
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        // Render Main Chart and Table
+        function renderChartAndTable(data) {
+            if (!data.length) {
+                showError('No data available to render.');
+                return;
+            }
+            currentData = data;
             // Filter Data
             const filterSource = document.getElementById('filterSource').value;
             const filterLatency = parseFloat(document.getElementById('filterLatency').value) || Infinity;
             const filteredData = filterSource === 'all' ? data : data.filter(d => d.source === filterSource);
             const finalData = filteredData.filter(d => d.avg_latency_ms <= filterLatency);
-
-            // Chart
+            // Main Chart
             const ctx = document.getElementById('throughputChart').getContext('2d');
             const sources = [...new Set(finalData.map(d => d.source))];
             const datasets = sources.map(source => ({
                 label: `${source} Throughput`,
                 data: finalData.filter(d => d.source === source).map(d => d.avg_throughput_mbps),
                 borderColor: source === 'main' ? '#1f77b4' : source === 'previous' ? '#ff7f0e' : source === 'compir' ? '#d62728' : source === 'previousCompir' ? '#2ca02c' : '#9467bd',
-                backgroundColor: source === 'main' ? 'rgba(31, 119, 180, 0.2)' : source === 'previous' ? 'rgba(255, 127, 14, 0.2)' : source === 'compir' ? 'rgba(214, 39, 40, 0.2)' : source === 'previousCompir' ? 'rgba(44, 160, 44, 0.2)' : 'rgba(148īn
-System: 148, 103, 189, 0.2)',
+                backgroundColor: source === 'main' ? 'rgba(31, 119, 180, 0.2)' : source === 'previous' ? 'rgba(255, 127, 14, 0.2)' : source === 'compir' ? 'rgba(214, 39, 40, 0.2)' : source === 'previousCompir' ? 'rgba(44, 160, 44, 0.2)' : 'rgba(148, 103, 189, 0.2)',
                 fill: true,
                 tension: 0.4,
                 pointRadius: 5,
                 pointHoverRadius: 8
             }));
-
             if (chartInstance) chartInstance.destroy();
             chartInstance = new Chart(ctx, {
                 type: 'line',
@@ -456,10 +485,7 @@ System: 148, 103, 189, 0.2)',
                 },
                 options: {
                     responsive: true,
-                    interaction: {
-                        mode: 'nearest',
-                        intersect: true
-                    },
+                    interaction: { mode: 'nearest', intersect: true },
                     plugins: {
                         title: {
                             display: true,
@@ -505,7 +531,6 @@ System: 148, 103, 189, 0.2)',
                     }
                 }
             });
-
             // Table
             const tbody = document.getElementById('metricsBody');
             tbody.innerHTML = '';
@@ -531,7 +556,6 @@ System: 148, 103, 189, 0.2)',
                     delay: index * 100
                 });
             });
-
             // Accessibility: Keyboard navigation for table rows
             const tableRows = document.querySelectorAll('.table-row');
             tableRows.forEach(row => {
@@ -547,64 +571,84 @@ System: 148, 103, 189, 0.2)',
         // Event Listeners
         function setupEventListeners() {
             // Theme Toggle
-            document.getElementById('themeToggle').addEventListener('click', () => {
-                document.body.classList.toggle('dark');
-                document.body.classList.toggle('light');
-                document.getElementById('themeToggle').innerText = document.body.classList.contains('dark') ? 'Switch to Light Theme' : 'Switch to Dark Theme';
-                if (chartInstance) {
-                    chartInstance.options.plugins.title.color = document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748';
-                    chartInstance.options.scales.x.title.color = document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748';
-                    chartInstance.options.scales.y.title.color = document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748';
-                    chartInstance.options.scales.x.ticks.color = document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748';
-                    chartInstance.options.scales.y.ticks.color = document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748';
-                    chartInstance.options.plugins.legend.labels.color = document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748';
-                    chartInstance.update();
-                }
-                anime({
-                    targets: '.chart-container, #metricsTable th, #metricsTable td',
-                    backgroundColor: document.body.classList.contains('dark') ? '#2d3748' : '#edf2f7',
-                    color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748',
-                    duration: 300,
-                    easing: 'easeInOutQuad'
+            const themeToggle = document.getElementById('themeToggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', () => {
+                    document.body.classList.toggle('dark');
+                    document.body.classList.toggle('light');
+                    themeToggle.innerText = document.body.classList.contains('dark') ? 'Switch to Light Theme' : 'Switch to Dark Theme';
+                    [chartInstance, simulationChartInstance].forEach(chart => {
+                        if (chart) {
+                            chart.options.plugins.title.color = document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748';
+                            chart.options.scales.x.title.color = document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748';
+                            chart.options.scales.y.title.color = document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748';
+                            chart.options.scales.x.ticks.color = document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748';
+                            chart.options.scales.y.ticks.color = document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748';
+                            chart.options.plugins.legend.labels.color = document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748';
+                            chart.update();
+                        }
+                    });
+                    anime({
+                        targets: '.chart-container, #metricsTable th, #metricsTable td',
+                        backgroundColor: document.body.classList.contains('dark') ? '#2d3748' : '#edf2f7',
+                        color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748',
+                        duration: 300,
+                        easing: 'easeInOutQuad'
+                    });
                 });
-            });
+            }
 
             // Filter Data
-            document.getElementById('filterSource').addEventListener('change', () => renderChartAndTable(currentData));
-            document.getElementById('filterLatency').addEventListener('input', () => renderChartAndTable(currentData));
+            const filterSource = document.getElementById('filterSource');
+            const filterLatency = document.getElementById('filterLatency');
+            if (filterSource) {
+                filterSource.addEventListener('change', () => {
+                    if (currentData.length) renderChartAndTable(currentData);
+                });
+            }
+            if (filterLatency) {
+                filterLatency.addEventListener('input', () => {
+                    if (currentData.length) renderChartAndTable(currentData);
+                });
+            }
 
             // Refresh Button
-            document.getElementById('refreshData').addEventListener('click', () => initDashboard(0));
+            const refreshData = document.getElementById('refreshData');
+            if (refreshData) {
+                refreshData.addEventListener('click', () => {
+                    document.getElementById('realTimeStatus').innerText = 'Status: Refreshing data...';
+                    initDashboard(0);
+                });
+            }
 
             // Export CSV
-            document.getElementById('exportCsv').addEventListener('click', () => exportToCsv(currentData));
+            const exportCsv = document.getElementById('exportCsv');
+            if (exportCsv) {
+                exportCsv.addEventListener('click', () => exportToCsv(currentData));
+            }
 
             // Close Modal
-            document.getElementById('closeModal').addEventListener('click', closeModal);
-
-            // Keyboard Accessibility for Modal
-            document.getElementById('closeModal').addEventListener('keydown', (e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    closeModal();
-                }
-            });
+            const closeModalBtn = document.getElementById('closeModal');
+            if (closeModalBtn) {
+                closeModalBtn.addEventListener('click', closeModal);
+                closeModalBtn.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        closeModal();
+                    }
+                });
+            }
         }
 
         // Initialize Dashboard
         async function initDashboard(retryCount = 0) {
+            document.getElementById('realTimeStatus').innerText = 'Status: Initializing dashboard...';
             if (retryCount >= 3) {
-                document.getElementById('realTimeStatus').innerText = 'Status: Max retries reached. Using local data...';
-                const jsonData = await fetchLocalJson();
-                if (jsonData && jsonData.length) {
-                    renderChartAndTable(jsonData);
-                    return;
-                }
-                const csvData = await loadSimulationData();
-                if (csvData && csvData.length) renderChartAndTable(csvData);
+                document.getElementById('realTimeStatus').innerText = 'Status: Max retries reached. Using mock data...';
+                renderChartAndTable(mockData);
+                loadAndRenderSimulationChart();
                 return;
             }
-
             const tokenValid = await verifyToken();
             let data = tokenValid ? await fetchRadarData() : null;
             if (!data || data.length === 0) {
@@ -614,10 +658,11 @@ System: 148, 103, 189, 0.2)',
                 }
             }
             if (data.length) renderChartAndTable(data);
-
-            // Initialize WebSocket if token is valid
-            if (tokenValid && !ws) initWebSocket();
-
+            else {
+                document.getElementById('realTimeStatus').innerText = 'Status: No data available. Using mock data...';
+                renderChartAndTable(mockData);
+            }
+            loadAndRenderSimulationChart();
             setTimeout(() => initDashboard(retryCount + 1), 60000);
         }
 
