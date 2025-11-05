@@ -151,16 +151,14 @@
         const CLOUDFLARE_ACCOUNT_ID = '244d138842181939362ff7ed67787e4a';
         const RADAR_API_URL = 'https://api.cloudflare.com/client/v4/radar/netflows/top/locations?name=main&name=previous&name=compir&name=previousCompir&location=IR&dateStart=2025-10-29T00:00:00.000Z&dateStart=2025-10-22T00:00:00.000Z&dateStart=2025-10-29T00:00:00.000Z&dateStart=2025-10-22T00:00:00.000Z&dateEnd=2025-11-05T11:36:00.000Z&dateEnd=2025-10-29T00:00:00.000Z&dateEnd=2025-11-05T11:36:00.000Z&dateEnd=2025-10-29T00:00:00.000Z&product=HTTP&limit=200';
         const FALLBACK_JSON_URL = 'radar_data.json';
-        // const WEBSOCKET_URL = 'wss://radar-ws.example.com'; // Disabled: Placeholder URL
         let chartInstance = null;
         let simulationChartInstance = null;
         let currentData = [];
         let isRealTime = false;
         let errorCount = 0;
-        // let ws = null; // Disabled WebSocket
 
         // Mock Data Fallback
-        const mockData = Array.from({ length: 10 }, (_, i) => ({
+        const mockData = Array.from({ length: 21 }, (_, i) => ({
             timestamp: new Date(Date.now() - i * 3600000).toISOString(),
             scenario: i + 1,
             avg_latency_ms: Math.random() * 50 + 20,
@@ -242,11 +240,11 @@
                     if (apiData.result[key]) {
                         apiData.result[key].forEach(item => {
                             processed.push({
-                                timestamp: apiData.result.meta.dateRange[index]?.startTime || new Date().toISOString(),
+                                timestamp: apiData.result.meta?.dateRange?.[index]?.startTime || new Date().toISOString(),
                                 scenario: processed.length + 1,
-                                avg_latency_ms: Math.random() * 50 + 20, // Mock: replace with real latency if available
-                                avg_throughput_mbps: parseFloat(item.value) * 0.5 + 10,
-                                drop_rate: Math.random() * 0.05,
+                                avg_latency_ms: parseFloat(item.latency) || Math.random() * 50 + 20,
+                                avg_throughput_mbps: parseFloat(item.value) || Math.random() * 100 + 10,
+                                drop_rate: parseFloat(item.dropRate) || Math.random() * 0.05,
                                 source: key
                             });
                         });
@@ -268,32 +266,76 @@
         async function fetchLocalJson() {
             try {
                 const response = await fetch(FALLBACK_JSON_URL);
-                if (!response.ok) throw new Error(`Local JSON fetch failed: ${response.status}`);
-                const apiData = await response.json();
-                if (!apiData.success) throw new Error('Local JSON error');
+                if (!response.ok) throw new Error(`HTTP error: ${response.status} ${response.statusText}`);
+                
+                let apiData;
+                try {
+                    apiData = await response.json();
+                } catch (parseError) {
+                    throw new Error(`JSON parsing failed: ${parseError.message}`);
+                }
+
+                // Check if JSON structure is valid
+                if (!apiData || typeof apiData !== 'object') {
+                    throw new Error('Invalid JSON structure: Data is not an object');
+                }
+
+                // Assume your JSON has a flat array of 21 data points
+                // Example structure: { "data": [{ "timestamp": "...", "throughput": 50, "latency": 30, "dropRate": 0.01 }, ...] }
                 const processed = [];
-                ['main', 'previous', 'compir', 'previousCompir'].forEach((key, index) => {
-                    if (apiData.result[key]) {
-                        apiData.result[key].forEach(item => {
-                            processed.push({
-                                timestamp: apiData.result.meta.dateRange[index]?.startTime || new Date().toISOString(),
-                                scenario: processed.length + 1,
-                                avg_latency_ms: Math.random() * 50 + 20,
-                                avg_throughput_mbps: parseFloat(item.value) * 0.5 + 10,
-                                drop_rate: Math.random() * 0.05,
-                                source: key
-                            });
+                if (Array.isArray(apiData.data)) {
+                    apiData.data.forEach((item, index) => {
+                        processed.push({
+                            timestamp: item.timestamp || new Date().toISOString(),
+                            scenario: index + 1,
+                            avg_latency_ms: parseFloat(item.latency) || Math.random() * 50 + 20,
+                            avg_throughput_mbps: parseFloat(item.throughput) || Math.random() * 100 + 10,
+                            drop_rate: parseFloat(item.dropRate) || Math.random() * 0.05,
+                            source: item.source || 'local'
                         });
-                    }
-                });
-                isRealTime = false;
+                    });
+                } else if (apiData.result && typeof apiData.result === 'object') {
+                    // Original structure: { "success": true, "result": { "main": [...], "previous": [...], ... }, "meta": { "dateRange": [...] } }
+                    if (!apiData.success) throw new Error('Local JSON error: success property is false');
+                    ['main', 'previous', 'compir', 'previousCompir'].forEach((key, index) => {
+                        if (apiData.result[key] && Array.isArray(apiData.result[key])) {
+                            apiData.result[key].forEach(item => {
+                                processed.push({
+                                    timestamp: apiData.result.meta?.dateRange?.[index]?.startTime || new Date().toISOString(),
+                                    scenario: processed.length + 1,
+                                    avg_latency_ms: parseFloat(item.latency) || Math.random() * 50 + 20,
+                                    avg_throughput_mbps: parseFloat(item.value) || Math.random() * 100 + 10,
+                                    drop_rate: parseFloat(item.dropRate) || Math.random() * 0.05,
+                                    source: key
+                                });
+                            });
+                        }
+                    });
+                } else {
+                    throw new Error('Invalid JSON structure: Expected "data" array or "result" object');
+                }
+
+                if (processed.length === 0) {
+                    throw new Error('No data points processed from JSON');
+                }
+
                 document.getElementById('realTimeStatus').innerText = `Status: Local JSON data loaded: ${processed.length} points at ${new Date().toLocaleString('en-US')}`;
                 return processed;
             } catch (error) {
                 document.getElementById('realTimeStatus').innerText = `Status: Local JSON load failed: ${error.message}. Falling back to simulation...`;
                 console.error('JSON error:', error);
                 showError(`Local JSON load failed: ${error.message}`);
-                return null;
+                // Fallback to mock data
+                const mockData = Array.from({ length: 21 }, (_, i) => ({
+                    timestamp: new Date(Date.now() - i * 3600000).toISOString(),
+                    scenario: i + 1,
+                    avg_latency_ms: Math.random() * 50 + 20,
+                    avg_throughput_mbps: Math.random() * 100 + 10,
+                    drop_rate: Math.random() * 0.05,
+                    source: 'mock'
+                }));
+                document.getElementById('realTimeStatus').innerText = `Status: Using mock JSON data: ${mockData.length} points at ${new Date().toLocaleString('en-US')}`;
+                return mockData;
             }
         }
 
@@ -320,7 +362,7 @@
                 console.error('CSV error:', error);
                 showError(`Simulation data load failed: ${error.message}`);
                 errorCount++;
-                return mockData; // Fallback to mock data
+                return mockData;
             }
         }
 
@@ -396,7 +438,6 @@
                 document.getElementById('realTimeStatus').innerText = `Status: Failed to load simulation CSV: ${error.message}. Using mock data...`;
                 console.error('Simulation CSV error:', error);
                 showError(`Failed to load simulation CSV: ${error.message}`);
-                // Render mock data as fallback
                 const ctx = document.getElementById('simulationChart').getContext('2d');
                 if (simulationChartInstance) simulationChartInstance.destroy();
                 simulationChartInstance = new Chart(ctx, {
@@ -458,12 +499,10 @@
                 return;
             }
             currentData = data;
-            // Filter Data
             const filterSource = document.getElementById('filterSource').value;
             const filterLatency = parseFloat(document.getElementById('filterLatency').value) || Infinity;
             const filteredData = filterSource === 'all' ? data : data.filter(d => d.source === filterSource);
             const finalData = filteredData.filter(d => d.avg_latency_ms <= filterLatency);
-            // Main Chart
             const ctx = document.getElementById('throughputChart').getContext('2d');
             const sources = [...new Set(finalData.map(d => d.source))];
             const datasets = sources.map(source => ({
@@ -531,7 +570,6 @@
                     }
                 }
             });
-            // Table
             const tbody = document.getElementById('metricsBody');
             tbody.innerHTML = '';
             finalData.slice(0, 10).forEach((row, index) => {
@@ -556,7 +594,6 @@
                     delay: index * 100
                 });
             });
-            // Accessibility: Keyboard navigation for table rows
             const tableRows = document.querySelectorAll('.table-row');
             tableRows.forEach(row => {
                 row.addEventListener('keydown', (e) => {
@@ -570,7 +607,6 @@
 
         // Event Listeners
         function setupEventListeners() {
-            // Theme Toggle
             const themeToggle = document.getElementById('themeToggle');
             if (themeToggle) {
                 themeToggle.addEventListener('click', () => {
@@ -598,7 +634,6 @@
                 });
             }
 
-            // Filter Data
             const filterSource = document.getElementById('filterSource');
             const filterLatency = document.getElementById('filterLatency');
             if (filterSource) {
@@ -612,7 +647,6 @@
                 });
             }
 
-            // Refresh Button
             const refreshData = document.getElementById('refreshData');
             if (refreshData) {
                 refreshData.addEventListener('click', () => {
@@ -621,13 +655,11 @@
                 });
             }
 
-            // Export CSV
             const exportCsv = document.getElementById('exportCsv');
             if (exportCsv) {
                 exportCsv.addEventListener('click', () => exportToCsv(currentData));
             }
 
-            // Close Modal
             const closeModalBtn = document.getElementById('closeModal');
             if (closeModalBtn) {
                 closeModalBtn.addEventListener('click', closeModal);
