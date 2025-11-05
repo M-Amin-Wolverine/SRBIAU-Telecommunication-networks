@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fa" dir="rtl">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IPv6/NAT Iran Radar Dashboard - 🔥 Live خفن 🔥</title>
+    <title>داشبورد رادار ایران IPv6/NAT - 🔥 بلادرنگ خفن 🔥</title>
     <!-- Tailwind CSS CDN -->
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <!-- Chart.js CDN -->
@@ -12,7 +12,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
     <style>
         body {
-            font-family: 'Inter', sans-serif;
+            font-family: 'Vazir', 'Inter', sans-serif;
             transition: background-color 0.3s, color 0.3s;
         }
         .dark { background-color: #1a202c; color: #e2e8f0; }
@@ -51,41 +51,42 @@
 </head>
 <body class="min-h-screen flex flex-col items-center p-6 dark">
     <div class="text-center">
-        <h1 class="text-5xl font-extrabold text-blue-400 mb-4 animate-title">IPv6/NAT Iran Radar Dashboard - 🔥 Live خفن 🔥</h1>
-        <p class="text-lg mb-6">Real-time Cloudflare Radar Netflows for Iran (No Storage)</p>
-        <div id="realTimeStatus" class="mb-6">Status: Initializing token verification...</div>
+        <h1 class="text-5xl font-extrabold text-blue-400 mb-4 animate-title">داشبورد رادار ایران IPv6/NAT - 🔥 بلادرنگ خفن 🔥</h1>
+        <p class="text-lg mb-6">داده‌های بلادرنگ شبکه ایران از Cloudflare Radar (بدون ذخیره)</p>
+        <div id="realTimeStatus" class="mb-6">وضعیت: در حال تأیید توکن...</div>
         <div class="progress-bar w-full max-w-md"></div>
     </div>
 
     <!-- Controls -->
     <div class="flex flex-wrap gap-4 mb-8">
-        <button id="themeToggle" class="button px-4 py-2 bg-blue-500 text-white rounded-lg">Switch to Light Theme</button>
-        <select id="filterType" class="filter-select px-4 py-2 bg-gray-700 text-white rounded-lg">
-            <option value="all">All Traffic Types</option>
-            <option value="http">HTTP</option>
-            <option value="video">Video</option>
-            <option value="censored">Censored</option>
+        <button id="themeToggle" class="button px-4 py-2 bg-blue-500 text-white rounded-lg">تغییر به تم روشن</button>
+        <select id="filterSource" class="filter-select px-4 py-2 bg-gray-700 text-white rounded-lg">
+            <option value="all">همه منابع</option>
+            <option value="main">Main</option>
+            <option value="previous">Previous</option>
+            <option value="compir">Compir</option>
+            <option value="previousCompir">Previous Compir</option>
+            <option value="simulation">شبیه‌سازی</option>
         </select>
-        <button id="refreshData" class="button px-4 py-2 bg-purple-500 text-white rounded-lg">Refresh Now</button>
+        <button id="refreshData" class="button px-4 py-2 bg-purple-500 text-white rounded-lg">تازه‌سازی</button>
     </div>
 
     <!-- Chart -->
     <div class="chart-container w-full max-w-4xl mb-8">
-        <canvas id="latencyChart"></canvas>
+        <canvas id="throughputChart"></canvas>
     </div>
 
     <!-- Table -->
     <div class="chart-container w-full max-w-4xl mb-8">
-        <h2 class="text-2xl font-semibold mb-4">Live Network Metrics</h2>
+        <h2 class="text-2xl font-semibold mb-4">متریک‌های شبکه بلادرنگ</h2>
         <table id="metricsTable" class="w-full border-collapse border border-gray-600">
             <thead>
                 <tr class="bg-gray-700 light:bg-gray-200">
-                    <th class="border border-gray-600 p-2">Timestamp</th>
-                    <th class="border border-gray-600 p-2">Latency (ms)</th>
-                    <th class="border border-gray-600 p-2">Throughput (Mbps)</th>
-                    <th class="border border-gray-600 p-2">Drop Rate (%)</th>
-                    <th class="border border-gray-600 p-2">Traffic Type</th>
-                    <th class="border border-gray-600 p-2">Source</th>
+                    <th class="border border-gray-600 p-2">زمان</th>
+                    <th class="border border-gray-600 p-2">پهنای باند (Mbps)</th>
+                    <th class="border border-gray-600 p-2">تأخیر (ms)</th>
+                    <th class="border border-gray-600 p-2">نرخ افت (%)</th>
+                    <th class="border border-gray-600 p-2">منبع</th>
                 </tr>
             </thead>
             <tbody id="metricsBody"></tbody>
@@ -94,20 +95,21 @@
 
     <!-- Fallback Image -->
     <div class="chart-container w-full max-w-4xl mb-8">
-        <h2 class="text-2xl font-semibold mb-4">Simulation Fallback</h2>
+        <h2 class="text-2xl font-semibold mb-4">فال‌بک شبیه‌سازی</h2>
         <img src="simulation_results.png" alt="Fallback Plot" class="w-full rounded-lg">
     </div>
 
     <!-- Links -->
     <div class="flex flex-wrap gap-4">
-        <a href="iran-network-status.md" class="text-blue-400 hover:text-blue-300">Network Analysis</a>
-        <a href="simulation_results.csv" download class="text-blue-400 hover:text-blue-300">Simulation CSV</a>
+        <a href="iran-network-status.md" class="text-blue-400 hover:text-blue-300">تحلیل شبکه</a>
+        <a href="simulation_results.csv" download class="text-blue-400 hover:text-blue-300">CSV شبیه‌سازی</a>
     </div>
 
     <script>
         const CLOUDFLARE_TOKEN = 'ebZoH8EbETLL27or2UaoBmCYsAf96jgrZMJjWoxr';
         const CLOUDFLARE_ACCOUNT_ID = '244d138842181939362ff7ed67787e4a';
-        const RADAR_API_URL = 'https://api.cloudflare.com/client/v4/radar/netflows/top/locations?name=main&name=previous&name=compir&name=previousCompir&location=IR&location=IR&location=IR&location=IR&dateStart=2025-10-29T21:45:00.000Z&dateStart=2024-04-01T21:45:00.000Z&dateStart=2025-10-29T21:45:00.000Z&dateStart=2024-04-01T21:45:00.000Z&dateEnd=2025-11-05T21:44:59.999Z&dateEnd=2024-04-08T21:44:59.999Z&dateEnd=2025-11-05T21:44:59.999Z&dateEnd=2024-04-08T21:44:59.999Z&product=HTTP&product=HTTP&product=HTTP&product=HTTP&limit=200';
+        const RADAR_API_URL = 'https://api.cloudflare.com/client/v4/radar/netflows/top/locations?name=main&name=previous&name=compir&name=previousCompir&location=IR&dateStart=2025-10-29T00:00:00.000Z&dateStart=2025-10-22T00:00:00.000Z&dateStart=2025-10-29T00:00:00.000Z&dateStart=2025-10-22T00:00:00.000Z&dateEnd=2025-11-05T11:36:00.000Z&dateEnd=2025-10-29T00:00:00.000Z&dateEnd=2025-11-05T11:36:00.000Z&dateEnd=2025-10-29T00:00:00.000Z&product=HTTP&limit=200';
+        const FALLBACK_JSON_URL = 'radar_data.json';
         let chartInstance = null;
         let currentData = [];
         let isRealTime = false;
@@ -119,17 +121,17 @@
                 const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/tokens/verify`, {
                     headers: { 'Authorization': `Bearer ${CLOUDFLARE_TOKEN}`, 'Content-Type': 'application/json' }
                 });
-                if (!response.ok) throw new Error(`Token verify failed: ${response.status}`);
+                if (!response.ok) throw new Error(`توکن نامعتبر است: ${response.status}`);
                 const data = await response.json();
                 if (data.success) {
-                    document.getElementById('realTimeStatus').innerText = 'Status: Token verified! Fetching live Radar data...';
+                    document.getElementById('realTimeStatus').innerText = 'وضعیت: توکن تأیید شد! در حال دریافت داده‌های رادار...';
                     errorCount = 0;
                     return true;
                 }
-                throw new Error('Token invalid');
+                throw new Error('توکن نامعتبر');
             } catch (error) {
-                document.getElementById('realTimeStatus').innerText = `Status: Token verification failed: ${error.message}. Retrying...`;
-                console.error('Token error:', error);
+                document.getElementById('realTimeStatus').innerText = `وضعیت: خطا در تأیید توکن: ${error.message}. تلاش مجدد...`;
+                console.error('خطای توکن:', error);
                 errorCount++;
                 return false;
             }
@@ -141,11 +143,11 @@
                 const response = await fetch(RADAR_API_URL, {
                     headers: { 'Authorization': `Bearer ${CLOUDFLARE_TOKEN}`, 'Accept': 'application/json' }
                 });
-                if (!response.ok) throw new Error(`Radar fetch failed: ${response.status}`);
+                if (!response.ok) throw new Error(`خطا در دریافت داده‌های رادار: ${response.status}`);
                 const apiData = await response.json();
-                if (!apiData.success) throw new Error('Radar API error');
+                if (!apiData.success) throw new Error('خطای API رادار: ' + (apiData.errors[0]?.message || 'Unknown error'));
 
-                // Map Radar netflows to simulation format (mock latency/throughput for demo)
+                // Map Radar netflows to simulation format
                 const processed = [];
                 ['main', 'previous', 'compir', 'previousCompir'].forEach((key, index) => {
                     apiData.result[key].forEach(item => {
@@ -155,19 +157,50 @@
                             avg_latency_ms: Math.random() * 50 + 20, // Mock: replace with real latency if available
                             avg_throughput_mbps: parseFloat(item.value) * 0.5 + 10, // Scale value to Mbps
                             drop_rate: Math.random() * 0.05, // Mock: replace with real drop rate
-                            traffic_type: ['http', 'video', 'censored'][processed.length % 3],
                             source: key
                         });
                     });
                 });
 
                 isRealTime = true;
-                document.getElementById('realTimeStatus').innerText = `Status: Live Radar data loaded: ${processed.length} points at ${new Date().toLocaleString('fa-IR')}`;
+                document.getElementById('realTimeStatus').innerText = `وضعیت: داده‌های بلادرنگ رادار لود شد: ${processed.length} نقطه در ${new Date().toLocaleString('fa-IR')}`;
                 return processed;
             } catch (error) {
-                document.getElementById('realTimeStatus').innerText = `Status: Radar fetch failed: ${error.message}. Falling back to simulation...`;
-                console.error('Radar error:', error);
+                document.getElementById('realTimeStatus').innerText = `وضعیت: خطا در دریافت داده‌های رادار: ${error.message}. فال‌بک به داده‌های محلی...`;
+                console.error('خطای رادار:', error);
                 errorCount++;
+                return null;
+            }
+        }
+
+        // Fallback to Local JSON
+        async function fetchLocalJson() {
+            try {
+                const response = await fetch(FALLBACK_JSON_URL);
+                const apiData = await response.json();
+                if (!apiData.success) throw new Error('خطای JSON محلی');
+
+                // Map JSON to simulation format
+                const processed = [];
+                ['main', 'previous', 'compir', 'previousCompir'].forEach((key, index) => {
+                    apiData.result[key].forEach(item => {
+                        processed.push({
+                            timestamp: apiData.result.meta.dateRange[index].startTime,
+                            scenario: processed.length + 1,
+                            avg_latency_ms: Math.random() * 50 + 20,
+                            avg_throughput_mbps: parseFloat(item.value) * 0.5 + 10,
+                            drop_rate: Math.random() * 0.05,
+                            source: key
+                        });
+                    });
+                });
+
+                isRealTime = false;
+                document.getElementById('realTimeStatus').innerText = `وضعیت: داده‌های JSON محلی لود شد: ${processed.length} نقطه در ${new Date().toLocaleString('fa-IR')}`;
+                return processed;
+            } catch (error) {
+                document.getElementById('realTimeStatus').innerText = `وضعیت: خطا در لود JSON محلی: ${error.message}. فال‌بک به شبیه‌سازی...`;
+                console.error('خطای JSON:', error);
                 return null;
             }
         }
@@ -185,17 +218,16 @@
                         avg_latency_ms: parseFloat(avg_latency_ms) || 0,
                         avg_throughput_mbps: parseFloat(avg_throughput_mbps) || 0,
                         drop_rate: parseFloat(drop_rate) || 0,
-                        traffic_type: traffic_type || 'unknown',
-                        timestamp: new Date().toISOString(),
-                        source: 'simulation'
+                        source: 'simulation',
+                        timestamp: new Date().toISOString()
                     };
                 });
                 isRealTime = false;
-                document.getElementById('realTimeStatus').innerText = `Status: Simulation data loaded: ${data.length} points at ${new Date().toLocaleString('fa-IR')}`;
+                document.getElementById('realTimeStatus').innerText = `وضعیت: داده‌های شبیه‌سازی لود شد: ${data.length} نقطه در ${new Date().toLocaleString('fa-IR')}`;
                 return data;
             } catch (error) {
-                document.getElementById('realTimeStatus').innerText = 'Status: Error loading simulation data';
-                console.error('CSV error:', error);
+                document.getElementById('realTimeStatus').innerText = 'وضعیت: خطا در لود داده‌های شبیه‌سازی';
+                console.error('خطای CSV:', error);
                 errorCount++;
                 return [];
             }
@@ -207,17 +239,17 @@
             currentData = data;
 
             // Filter Data
-            const filterType = document.getElementById('filterType').value;
-            const filteredData = filterType === 'all' ? data : data.filter(d => d.traffic_type === filterType);
+            const filterSource = document.getElementById('filterSource').value;
+            const filteredData = filterSource === 'all' ? data : data.filter(d => d.source === filterSource);
 
             // Chart
-            const ctx = document.getElementById('latencyChart').getContext('2d');
-            const trafficTypes = [...new Set(filteredData.map(d => d.traffic_type))];
-            const datasets = trafficTypes.map(type => ({
-                label: `${type} Latency`,
-                data: filteredData.filter(d => d.traffic_type === type).map(d => d.avg_latency_ms),
-                borderColor: type === 'http' ? '#1f77b4' : type === 'video' ? '#ff7f0e' : type === 'censored' ? '#d62728' : '#2ca02c',
-                backgroundColor: type === 'http' ? 'rgba(31, 119, 180, 0.2)' : type === 'video' ? 'rgba(255, 127, 14, 0.2)' : type === 'censored' ? 'rgba(214, 39, 40, 0.2)' : 'rgba(44, 160, 44, 0.2)',
+            const ctx = document.getElementById('throughputChart').getContext('2d');
+            const sources = [...new Set(filteredData.map(d => d.source))];
+            const datasets = sources.map(source => ({
+                label: `${source} پهنای باند`,
+                data: filteredData.filter(d => d.source === source).map(d => d.avg_throughput_mbps),
+                borderColor: source === 'main' ? '#1f77b4' : source === 'previous' ? '#ff7f0e' : source === 'compir' ? '#d62728' : source === 'previousCompir' ? '#2ca02c' : '#9467bd',
+                backgroundColor: source === 'main' ? 'rgba(31, 119, 180, 0.2)' : source === 'previous' ? 'rgba(255, 127, 14, 0.2)' : source === 'compir' ? 'rgba(214, 39, 40, 0.2)' : source === 'previousCompir' ? 'rgba(44, 160, 44, 0.2)' : 'rgba(148, 103, 189, 0.2)',
                 fill: true
             }));
             if (chartInstance) chartInstance.destroy();
@@ -230,12 +262,12 @@
                 options: {
                     responsive: true,
                     plugins: {
-                        title: { display: true, text: isRealTime ? 'Live Radar Latency (Iran)' : 'Simulation Latency', color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748' },
+                        title: { display: true, text: isRealTime ? 'پهنای باند بلادرنگ رادار (ایران)' : 'پهنای باند شبیه‌سازی', color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748' },
                         legend: { position: 'top', labels: { color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748' } }
                     },
                     scales: {
                         x: { title: { display: true, text: isRealTime ? 'زمان' : 'سناریو #', color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748' }, ticks: { color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748' } },
-                        y: { title: { display: true, text: 'تأخیر (ms)', color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748' }, ticks: { color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748' }, beginAtZero: true }
+                        y: { title: { display: true, text: 'پهنای باند (Mbps)', color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748' }, ticks: { color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748' }, beginAtZero: true }
                     }
                 }
             });
@@ -248,89 +280,90 @@
                 tr.className = 'table-row';
                 tr.innerHTML = `
                     <td class="border border-gray-600 p-2">${new Date(row.timestamp).toLocaleString('fa-IR')}</td>
-                    <td class="border border-gray-600 p-2">${row.avg_latency_ms.toFixed(2)}</td>
                     <td class="border border-gray-600 p-2">${row.avg_throughput_mbps.toFixed(2)}</td>
+                    <td class="border border-gray-600 p-2">${row.avg_latency_ms.toFixed(2)}</td>
                     <td class="border border-gray-600 p-2">${(row.drop_rate * 100).toFixed(2)}%</td>
-                    <td class="border border-gray-600 p-2">${row.traffic_type}</td>
                     <td class="border border-gray-600 p-2">${row.source}</td>
                 `;
                 tbody.appendChild(tr);
                 anime({
                     targets: tr,
                     translateY: [20, 0],
-                    opacity: [0, 1],
+                    opacity: [0, ascended
+
+System: 1],
                     duration: 500,
                     easing: 'easeOutQuad'
                 });
             });
 
-            // Animate Chart
+            // Theme Toggle
+            document.getElementById('themeToggle').addEventListener('click', () => {
+                document.body.classList.toggle('dark');
+                document.body.classList.toggle('light');
+                document.getElementById('themeToggle').innerText = document.body.classList.contains('dark') ? 'تغییر به تم روشن' : 'تغییر به تم تیره';
+                if (chartInstance) {
+                    chartInstance.options.plugins.title.color = document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748';
+                    chartInstance.options.scales.x.title.color = document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748';
+                    chartInstance.options.scales.y.title.color = document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748';
+                    chartInstance.options.scales.x.ticks.color = document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748';
+                    chartInstance.options.scales.y.ticks.color = document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748';
+                    chartInstance.options.plugins.legend.labels.color = document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748';
+                    chartInstance.update();
+                }
+                anime({
+                    targets: '.chart-container, #metricsTable th, #metricsTable td',
+                    backgroundColor: document.body.classList.contains('dark') ? '#2d3748' : '#edf2f7',
+                    color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748',
+                    duration: 300,
+                    easing: 'easeInOutQuad'
+                });
+            });
+
+            // Filter Data
+            document.getElementById('filterSource').addEventListener('change', () => {
+                renderChartAndTable(currentData);
+            });
+
+            // Refresh Button
+            document.getElementById('refreshData').addEventListener('click', () => initDashboard(0));
+
+            // Initialize Dashboard
+            async function initDashboard(retryCount = 0) {
+                if (retryCount >= 3) {
+                    document.getElementById('realTimeStatus').innerText = 'وضعیت: حداکثر تلاش‌ها انجام شد. استفاده از داده‌های محلی...';
+                    const jsonData = await fetchLocalJson();
+                    if (jsonData && jsonData.length) {
+                        renderChartAndTable(jsonData);
+                        return;
+                    }
+                    const csvData = await loadSimulationData();
+                    if (csvData && csvData.length) renderChartAndTable(csvData);
+                    return;
+                }
+                const tokenValid = await verifyToken();
+                let data = tokenValid ? await fetchRadarData() : null;
+                if (!data || data.length === 0) {
+                    data = await fetchLocalJson();
+                    if (!data || data.length === 0) {
+                        data = await loadSimulationData();
+                    }
+                }
+                if (data.length) renderChartAndTable(data);
+                setTimeout(() => initDashboard(retryCount + 1), 60000); // Increased to 60s to avoid rate limits
+            }
+
+            // Anime.js Title Animation
             anime({
-                targets: '.chart-container',
-                scale: [0.95, 1],
+                targets: '.animate-title',
+                scale: [0.8, 1],
                 opacity: [0, 1],
-                duration: 600,
-                easing: 'easeOutQuad'
+                duration: 1000,
+                easing: 'easeOutElastic(1, .6)'
             });
-        }
 
-        // Theme Toggle
-        document.getElementById('themeToggle').addEventListener('click', () => {
-            document.body.classList.toggle('dark');
-            document.body.classList.toggle('light');
-            document.getElementById('themeToggle').innerText = document.body.classList.contains('dark') ? 'Switch to Light Theme' : 'Switch to Dark Theme';
-            if (chartInstance) {
-                chartInstance.options.plugins.title.color = document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748';
-                chartInstance.options.scales.x.title.color = document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748';
-                chartInstance.options.scales.y.title.color = document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748';
-                chartInstance.options.scales.x.ticks.color = document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748';
-                chartInstance.options.scales.y.ticks.color = document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748';
-                chartInstance.options.plugins.legend.labels.color = document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748';
-                chartInstance.update();
-            }
-            anime({
-                targets: '.chart-container, #metricsTable th, #metricsTable td',
-                backgroundColor: document.body.classList.contains('dark') ? '#2d3748' : '#edf2f7',
-                color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748',
-                duration: 300,
-                easing: 'easeInOutQuad'
-            });
-        });
-
-        // Filter Data
-        document.getElementById('filterType').addEventListener('change', () => {
-            renderChartAndTable(currentData);
-        });
-
-        // Refresh Button
-        document.getElementById('refreshData').addEventListener('click', () => initDashboard(0));
-
-        // Initialize Dashboard
-        async function initDashboard(retryCount = 0) {
-            if (retryCount >= 3) {
-                document.getElementById('realTimeStatus').innerText = 'Status: Max retries reached. Using last available data.';
-                return;
-            }
-            const tokenValid = await verifyToken();
-            let data = tokenValid ? await fetchRadarData() : null;
-            if (!data || data.length === 0) {
-                data = await loadSimulationData();
-            }
-            if (data.length) renderChartAndTable(data);
-            setTimeout(() => initDashboard(retryCount + 1), 30000);
-        }
-
-        // Anime.js Title Animation
-        anime({
-            targets: '.animate-title',
-            scale: [0.8, 1],
-            opacity: [0, 1],
-            duration: 1000,
-            easing: 'easeOutElastic(1, .6)'
-        });
-
-        // Kickoff
-        initDashboard();
-    </script>
-</body>
+            // Kickoff
+            initDashboard();
+        </script>
+    </body>
 </html>
