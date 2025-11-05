@@ -1,18 +1,20 @@
 <!DOCTYPE html>
-<html lang="fa" dir="rtl">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>داشبورد رادار ایران IPv6/NAT - 🔥 بلادرنگ خفن 🔥</title>
+    <title>Iran IPv6/NAT Radar Dashboard - 🔥 Real-Time Epic 🔥</title>
     <!-- Tailwind CSS CDN -->
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <!-- Chart.js CDN -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.min.js"></script>
     <!-- Anime.js CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+    <!-- PapaParse for CSV handling -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
         body {
-            font-family: 'Vazir', 'Inter', sans-serif;
+            font-family: 'Inter', sans-serif;
             transition: background-color 0.3s, color 0.3s;
         }
         .dark { background-color: #1a202c; color: #e2e8f0; }
@@ -33,11 +35,11 @@
         .light #realTimeStatus { color: #4a5568; }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
         .table-row { transition: transform 0.2s, background-color 0.2s; }
-        .table-row:hover { transform: scale(1.02); background-color: rgba(66, 153, 225, 0.1); }
+        .table-row:hover, .table-row:focus { transform: scale(1.02); background-color: rgba(66, 153, 225, 0.1); }
         .button { transition: transform 0.2s, background-color 0.2s; }
-        .button:hover { transform: scale(1.05); }
-        .filter-select { transition: background-color 0.3s; }
-        .light .filter-select { background-color: #e2e8f0; color: #2d3748; }
+        .button:hover, .button:focus { transform: scale(1.05); }
+        .filter-select, .filter-input { transition: background-color 0.3s; }
+        .light .filter-select, .light .filter-input { background-color: #e2e8f0; color: #2d3748; }
         .progress-bar {
             height: 4px;
             background: linear-gradient(90deg, #1f77b4, #ff7f0e);
@@ -47,73 +49,233 @@
             0% { transform: translateX(-100%); }
             100% { transform: translateX(100%); }
         }
+        .tooltip {
+            position: absolute;
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        .light .tooltip { background: #edf2f7; color: #2d3748; }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .modal-content {
+            background: #2d3748;
+            padding: 20px;
+            border-radius: 8px;
+            max-width: 500px;
+            width: 90%;
+            color: #e2e8f0;
+        }
+        .light .modal-content { background: #edf2f7; color: #2d3748; }
     </style>
 </head>
 <body class="min-h-screen flex flex-col items-center p-6 dark">
     <div class="text-center">
-        <h1 class="text-5xl font-extrabold text-blue-400 mb-4 animate-title">داشبورد رادار ایران IPv6/NAT - 🔥 بلادرنگ خفن 🔥</h1>
-        <p class="text-lg mb-6">داده‌های بلادرنگ شبکه ایران از Cloudflare Radar (بدون ذخیره)</p>
-        <div id="realTimeStatus" class="mb-6">وضعیت: در حال تأیید توکن...</div>
+        <h1 class="text-5xl font-extrabold text-blue-400 mb-4 animate-title">Iran IPv6/NAT Radar Dashboard - 🔥 Real-Time Epic 🔥</h1>
+        <p class="text-lg mb-6">Real-time Iran network data from Cloudflare Radar (no storage)</p>
+        <div id="realTimeStatus" class="mb-6" role="status" aria-live="polite">Status: Verifying token...</div>
         <div class="progress-bar w-full max-w-md"></div>
     </div>
-
     <!-- Controls -->
-    <div class="flex flex-wrap gap-4 mb-8">
-        <button id="themeToggle" class="button px-4 py-2 bg-blue-500 text-white rounded-lg">تغییر به تم روشن</button>
-        <select id="filterSource" class="filter-select px-4 py-2 bg-gray-700 text-white rounded-lg">
-            <option value="all">همه منابع</option>
+    <div class="flex flex-wrap gap-4 mb-8" role="toolbar" aria-label="Dashboard controls">
+        <button id="themeToggle" class="button px-4 py-2 bg-blue-500 text-white rounded-lg" aria-label="Toggle theme">Switch to Light Theme</button>
+        <select id="filterSource" class="filter-select px-4 py-2 bg-gray-700 text-white rounded-lg" aria-label="Filter data source">
+            <option value="all">All Sources</option>
             <option value="main">Main</option>
             <option value="previous">Previous</option>
             <option value="compir">Compir</option>
             <option value="previousCompir">Previous Compir</option>
-            <option value="simulation">شبیه‌سازی</option>
+            <option value="simulation">Simulation</option>
         </select>
-        <button id="refreshData" class="button px-4 py-2 bg-purple-500 text-white rounded-lg">تازه‌سازی</button>
+        <input id="filterLatency" type="number" placeholder="Max Latency (ms)" class="filter-input px-4 py-2 bg-gray-700 text-white rounded-lg" aria-label="Filter by maximum latency">
+        <button id="refreshData" class="button px-4 py-2 bg-purple-500 text-white rounded-lg" aria-label="Refresh data">Refresh</button>
+        <button id="exportCsv" class="button px-4 py-2 bg-green-500 text-white rounded-lg" aria-label="Export to CSV">Export CSV</button>
     </div>
-
     <!-- Chart -->
-    <div class="chart-container w-full max-w-4xl mb-8">
-        <canvas id="throughputChart"></canvas>
+    <div class="chart-container w-full max-w-4xl mb-8" role="region" aria-label="Network throughput chart">
+        <canvas id="throughputChart" aria-label="Real-time throughput chart"></canvas>
+        <div id="chartTooltip" class="tooltip"></div>
     </div>
-
     <!-- Table -->
-    <div class="chart-container w-full max-w-4xl mb-8">
-        <h2 class="text-2xl font-semibold mb-4">متریک‌های شبکه بلادرنگ</h2>
-        <table id="metricsTable" class="w-full border-collapse border border-gray-600">
+    <div class="chart-container w-full max-w-4xl mb-8" role="region" aria-label="Network metrics table">
+        <h2 class="text-2xl font-semibold mb-4">Real-Time Network Metrics</h2>
+        <table id="metricsTable" class="w-full border-collapse border border-gray-600" role="grid">
             <thead>
                 <tr class="bg-gray-700 light:bg-gray-200">
-                    <th class="border border-gray-600 p-2">زمان</th>
-                    <th class="border border-gray-600 p-2">پهنای باند (Mbps)</th>
-                    <th class="border border-gray-600 p-2">تأخیر (ms)</th>
-                    <th class="border border-gray-600 p-2">نرخ افت (%)</th>
-                    <th class="border border-gray-600 p-2">منبع</th>
+                    <th class="border border-gray-600 p-2" scope="col">Time</th>
+                    <th class="border border-gray-600 p-2" scope="col">Throughput (Mbps)</th>
+                    <th class="border border-gray-600 p-2" scope="col">Latency (ms)</th>
+                    <th class="border border-gray-600 p-2" scope="col">Drop Rate (%)</th>
+                    <th class="border border-gray-600 p-2" scope="col">Source</th>
                 </tr>
             </thead>
             <tbody id="metricsBody"></tbody>
         </table>
     </div>
-
     <!-- Fallback Image -->
-    <div class="chart-container w-full max-w-4xl mb-8">
-        <h2 class="text-2xl font-semibold mb-4">فال‌بک شبیه‌سازی</h2>
-        <img src="simulation_results.png" alt="Fallback Plot" class="w-full rounded-lg">
-    </div>
+    <div class="chart-container w-full max-w-4xl mb-8" role="region" aria-label="Simulation fallback">
+        <h2 class="text-2xl font-semibold mb-4">Simulation Fallback</h2>
+        <!-- Fallback Chart Section -->
+<div class="chart-container w-full max-w-4xl mb-8" role="region" aria-label="Simulation fallback chart">
+    <h2 class="text-2xl font-semibold mb-4">Simulation Fallback Chart</h2>
+    <canvas id="simulationChart" aria-label="Simulation data chart"></canvas>
+</div>
 
+<script>
+// Ensure PapaParse is included in your <head> for CSV parsing
+// <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+
+// Add this to your existing JavaScript
+async function loadAndRenderSimulationChart() {
+    try {
+        const response = await fetch('simulation_results.csv');
+        if (!response.ok) throw new Error(`Failed to load CSV: ${response.status}`);
+        const csvText = await response.text();
+        const parsed = Papa.parse(csvText, { header: true, skipEmptyLines: true });
+        const data = parsed.data.map((row, index) => ({
+            scenario: parseInt(row.scenario) || index + 1,
+            avg_latency_ms: parseFloat(row.avg_latency_ms) || 0,
+            avg_throughput_mbps: parseFloat(row.avg_throughput_mbps) || 0,
+            drop_rate: parseFloat(row.drop_rate) || 0,
+            source: 'simulation',
+            timestamp: row.timestamp || new Date().toISOString()
+        }));
+
+        // Render Chart
+        const ctx = document.getElementById('simulationChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: data.map(d => `Scenario ${d.scenario}`),
+                datasets: [
+                    {
+                        label: 'Simulation Throughput',
+                        data: data.map(d => d.avg_throughput_mbps),
+                        borderColor: '#9467bd',
+                        backgroundColor: 'rgba(148, 103, 189, 0.2)',
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 5,
+                        pointHoverRadius: 8
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Simulation Throughput',
+                        color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748',
+                        font: { size: 18 }
+                    },
+                    legend: {
+                        position: 'top',
+                        labels: { color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748' }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: (context) => `${context.dataset.label}: ${context.raw.toFixed(2)} Mbps`
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        title: { display: true, text: 'Scenario #', color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748' },
+                        ticks: { color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748', maxRotation: 45, minRotation: 45 }
+                    },
+                    y: {
+                        title: { display: true, text: 'Throughput (Mbps)', color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748' },
+                        ticks: { color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748' },
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+
+        document.getElementById('realTimeStatus').innerText = `Status: Simulation chart loaded with ${data.length} points at ${new Date().toLocaleString('en-US')}`;
+    } catch (error) {
+        document.getElementById('realTimeStatus').innerText = `Status: Failed to load simulation CSV: ${error.message}`;
+        console.error('Simulation CSV error:', error);
+    }
+}
+
+// Call this function in your initDashboard or as needed
+loadAndRenderSimulationChart();
+</script>
+    </div>
+    <!-- Modal for Errors -->
+    <div id="errorModal" class="modal">
+        <div class="modal-content">
+            <h2 class="text-xl font-bold mb-4">Error</h2>
+            <p id="errorMessage"></p>
+            <button id="closeModal" class="button px-4 py-2 bg-blue-500 text-white rounded-lg mt-4">Close</button>
+        </div>
+    </div>
     <!-- Links -->
     <div class="flex flex-wrap gap-4">
-        <a href="iran-network-status.md" class="text-blue-400 hover:text-blue-300">تحلیل شبکه</a>
-        <a href="simulation_results.csv" download class="text-blue-400 hover:text-blue-300">CSV شبیه‌سازی</a>
+        <a href="iran-network-status.md" class="text-blue-400 hover:text-blue-300" aria-label="View network analysis">Network Analysis</a>
+        <a href="simulation_results.csv" download class="text-blue-400 hover:text-blue-300" aria-label="Download simulation CSV">Download Simulation CSV</a>
     </div>
-
     <script>
+        // Configuration
         const CLOUDFLARE_TOKEN = 'ebZoH8EbETLL27or2UaoBmCYsAf96jgrZMJjWoxr';
         const CLOUDFLARE_ACCOUNT_ID = '244d138842181939362ff7ed67787e4a';
         const RADAR_API_URL = 'https://api.cloudflare.com/client/v4/radar/netflows/top/locations?name=main&name=previous&name=compir&name=previousCompir&location=IR&dateStart=2025-10-29T00:00:00.000Z&dateStart=2025-10-22T00:00:00.000Z&dateStart=2025-10-29T00:00:00.000Z&dateStart=2025-10-22T00:00:00.000Z&dateEnd=2025-11-05T11:36:00.000Z&dateEnd=2025-10-29T00:00:00.000Z&dateEnd=2025-11-05T11:36:00.000Z&dateEnd=2025-10-29T00:00:00.000Z&product=HTTP&limit=200';
         const FALLBACK_JSON_URL = 'radar_data.json';
+        const WEBSOCKET_URL = 'wss://radar-ws.example.com'; // Placeholder for real WebSocket
         let chartInstance = null;
         let currentData = [];
         let isRealTime = false;
         let errorCount = 0;
+        let ws = null;
+
+        // Utility Functions
+        function showError(message) {
+            const modal = document.getElementById('errorModal');
+            document.getElementById('errorMessage').innerText = message;
+            modal.style.display = 'flex';
+            document.getElementById('closeModal').focus();
+        }
+
+        function closeModal() {
+            document.getElementById('errorModal').style.display = 'none';
+        }
+
+        function exportToCsv(data) {
+            const headers = ['Timestamp', 'Scenario', 'Throughput (Mbps)', 'Latency (ms)', 'Drop Rate (%)', 'Source'];
+            const csv = Papa.unparse({
+                fields: headers,
+                data: data.map(row => [
+                    new Date(row.timestamp).toLocaleString('en-US'),
+                    row.scenario,
+                    row.avg_throughput_mbps.toFixed(2),
+                    row.avg_latency_ms.toFixed(2),
+                    (row.drop_rate * 100).toFixed(2),
+                    row.source
+                ])
+            });
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `network_data_${new Date().toISOString()}.csv`;
+            link.click();
+        }
 
         // Verify Token
         async function verifyToken() {
@@ -121,56 +283,86 @@
                 const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/tokens/verify`, {
                     headers: { 'Authorization': `Bearer ${CLOUDFLARE_TOKEN}`, 'Content-Type': 'application/json' }
                 });
-                if (!response.ok) throw new Error(`توکن نامعتبر است: ${response.status}`);
+                if (!response.ok) throw new Error(`Invalid token: ${response.status}`);
                 const data = await response.json();
                 if (data.success) {
-                    document.getElementById('realTimeStatus').innerText = 'وضعیت: توکن تأیید شد! در حال دریافت داده‌های رادار...';
+                    document.getElementById('realTimeStatus').innerText = 'Status: Token verified! Fetching Radar data...';
                     errorCount = 0;
                     return true;
                 }
-                throw new Error('توکن نامعتبر');
+                throw new Error('Invalid token');
             } catch (error) {
-                document.getElementById('realTimeStatus').innerText = `وضعیت: خطا در تأیید توکن: ${error.message}. تلاش مجدد...`;
-                console.error('خطای توکن:', error);
+                document.getElementById('realTimeStatus').innerText = `Status: Token verification failed: ${error.message}. Retrying...`;
+                console.error('Token error:', error);
                 errorCount++;
+                showError(`Token verification failed: ${error.message}`);
                 return false;
             }
         }
 
-        // Fetch Radar Data (Live, no storage)
+        // Fetch Radar Data
         async function fetchRadarData() {
             try {
                 const response = await fetch(RADAR_API_URL, {
                     headers: { 'Authorization': `Bearer ${CLOUDFLARE_TOKEN}`, 'Accept': 'application/json' }
                 });
-                if (!response.ok) throw new Error(`خطا در دریافت داده‌های رادار: ${response.status}`);
+                if (!response.ok) throw new Error(`Radar data fetch failed: ${response.status}`);
                 const apiData = await response.json();
-                if (!apiData.success) throw new Error('خطای API رادار: ' + (apiData.errors[0]?.message || 'Unknown error'));
-
-                // Map Radar netflows to simulation format
+                if (!apiData.success) throw new Error('Radar API error: ' + (apiData.errors[0]?.message || 'Unknown error'));
                 const processed = [];
                 ['main', 'previous', 'compir', 'previousCompir'].forEach((key, index) => {
                     apiData.result[key].forEach(item => {
                         processed.push({
                             timestamp: apiData.result.meta.dateRange[index].startTime,
                             scenario: processed.length + 1,
-                            avg_latency_ms: Math.random() * 50 + 20, // Mock: replace with real latency if available
-                            avg_throughput_mbps: parseFloat(item.value) * 0.5 + 10, // Scale value to Mbps
-                            drop_rate: Math.random() * 0.05, // Mock: replace with real drop rate
+                            avg_latency_ms: Math.random() * 50 + 20, // Mock: replace with real latency
+                            avg_throughput_mbps: parseFloat(item.value) * 0.5 + 10,
+                            drop_rate: Math.random() * 0.05,
                             source: key
                         });
                     });
                 });
-
                 isRealTime = true;
-                document.getElementById('realTimeStatus').innerText = `وضعیت: داده‌های بلادرنگ رادار لود شد: ${processed.length} نقطه در ${new Date().toLocaleString('fa-IR')}`;
+                document.getElementById('realTimeStatus').innerText = `Status: Real-time Radar data loaded: ${processed.length} points at ${new Date().toLocaleString('en-US')}`;
                 return processed;
             } catch (error) {
-                document.getElementById('realTimeStatus').innerText = `وضعیت: خطا در دریافت داده‌های رادار: ${error.message}. فال‌بک به داده‌های محلی...`;
-                console.error('خطای رادار:', error);
+                document.getElementById('realTimeStatus').innerText = `Status: Radar data fetch failed: ${error.message}. Falling back to local data...`;
+                console.error('Radar error:', error);
                 errorCount++;
+                showError(`Radar data fetch failed: ${error.message}`);
                 return null;
             }
+        }
+
+        // WebSocket for Real-Time Updates
+        function initWebSocket() {
+            ws = new WebSocket(WEBSOCKET_URL);
+            ws.onopen = () => {
+                document.getElementById('realTimeStatus').innerText = 'Status: WebSocket connected! Receiving live updates...';
+            };
+            ws.onmessage = async (event) => {
+                try {
+                    const newData = JSON.parse(event.data);
+                    currentData.push(...newData.map((item, index) => ({
+                        timestamp: new Date().toISOString(),
+                        scenario: currentData.length + index + 1,
+                        avg_latency_ms: item.latency || Math.random() * 50 + 20,
+                        avg_throughput_mbps: item.throughput || Math.random() * 100 + 10,
+                        drop_rate: item.dropRate || Math.random() * 0.05,
+                        source: 'live'
+                    })));
+                    renderChartAndTable(currentData);
+                } catch (error) {
+                    console.error('WebSocket data error:', error);
+                }
+            };
+            ws.onclose = () => {
+                document.getElementById('realTimeStatus').innerText = 'Status: WebSocket disconnected. Reconnecting...';
+                setTimeout(initWebSocket, 5000);
+            };
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+            };
         }
 
         // Fallback to Local JSON
@@ -178,9 +370,7 @@
             try {
                 const response = await fetch(FALLBACK_JSON_URL);
                 const apiData = await response.json();
-                if (!apiData.success) throw new Error('خطای JSON محلی');
-
-                // Map JSON to simulation format
+                if (!apiData.success) throw new Error('Local JSON error');
                 const processed = [];
                 ['main', 'previous', 'compir', 'previousCompir'].forEach((key, index) => {
                     apiData.result[key].forEach(item => {
@@ -194,13 +384,13 @@
                         });
                     });
                 });
-
                 isRealTime = false;
-                document.getElementById('realTimeStatus').innerText = `وضعیت: داده‌های JSON محلی لود شد: ${processed.length} نقطه در ${new Date().toLocaleString('fa-IR')}`;
+                document.getElementById('realTimeStatus').innerText = `Status: Local JSON data loaded: ${processed.length} points at ${new Date().toLocaleString('en-US')}`;
                 return processed;
             } catch (error) {
-                document.getElementById('realTimeStatus').innerText = `وضعیت: خطا در لود JSON محلی: ${error.message}. فال‌بک به شبیه‌سازی...`;
-                console.error('خطای JSON:', error);
+                document.getElementById('realTimeStatus').innerText = `Status: Local JSON load failed: ${error.message}. Falling back to simulation...`;
+                console.error('JSON error:', error);
+                showError(`Local JSON load failed: ${error.message}`);
                 return null;
             }
         }
@@ -210,24 +400,22 @@
             try {
                 const response = await fetch('simulation_results.csv');
                 const csvText = await response.text();
-                const rows = csvText.split('\n').slice(1).filter(row => row);
-                const data = rows.map((row, index) => {
-                    const [scenario, avg_latency_ms, avg_throughput_mbps, drop_rate, , traffic_type] = row.split(',');
-                    return {
-                        scenario: parseInt(scenario) || index + 1,
-                        avg_latency_ms: parseFloat(avg_latency_ms) || 0,
-                        avg_throughput_mbps: parseFloat(avg_throughput_mbps) || 0,
-                        drop_rate: parseFloat(drop_rate) || 0,
-                        source: 'simulation',
-                        timestamp: new Date().toISOString()
-                    };
-                });
+                const parsed = Papa.parse(csvText, { header: true, skipEmptyLines: true });
+                const data = parsed.data.map((row, index) => ({
+                    scenario: parseInt(row.scenario) || index + 1,
+                    avg_latency_ms: parseFloat(row.avg_latency_ms) || 0,
+                    avg_throughput_mbps: parseFloat(row.avg_throughput_mbps) || 0,
+                    drop_rate: parseFloat(row.drop_rate) || 0,
+                    source: 'simulation',
+                    timestamp: new Date().toISOString()
+                }));
                 isRealTime = false;
-                document.getElementById('realTimeStatus').innerText = `وضعیت: داده‌های شبیه‌سازی لود شد: ${data.length} نقطه در ${new Date().toLocaleString('fa-IR')}`;
+                document.getElementById('realTimeStatus').innerText = `Status: Simulation data loaded: ${data.length} points at ${new Date().toLocaleString('en-US')}`;
                 return data;
             } catch (error) {
-                document.getElementById('realTimeStatus').innerText = 'وضعیت: خطا در لود داده‌های شبیه‌سازی';
-                console.error('خطای CSV:', error);
+                document.getElementById('realTimeStatus').innerText = 'Status: Simulation data load failed';
+                console.error('CSV error:', error);
+                showError('Simulation data load failed');
                 errorCount++;
                 return [];
             }
@@ -240,34 +428,80 @@
 
             // Filter Data
             const filterSource = document.getElementById('filterSource').value;
+            const filterLatency = parseFloat(document.getElementById('filterLatency').value) || Infinity;
             const filteredData = filterSource === 'all' ? data : data.filter(d => d.source === filterSource);
+            const finalData = filteredData.filter(d => d.avg_latency_ms <= filterLatency);
 
             // Chart
             const ctx = document.getElementById('throughputChart').getContext('2d');
-            const sources = [...new Set(filteredData.map(d => d.source))];
+            const sources = [...new Set(finalData.map(d => d.source))];
             const datasets = sources.map(source => ({
-                label: `${source} پهنای باند`,
-                data: filteredData.filter(d => d.source === source).map(d => d.avg_throughput_mbps),
+                label: `${source} Throughput`,
+                data: finalData.filter(d => d.source === source).map(d => d.avg_throughput_mbps),
                 borderColor: source === 'main' ? '#1f77b4' : source === 'previous' ? '#ff7f0e' : source === 'compir' ? '#d62728' : source === 'previousCompir' ? '#2ca02c' : '#9467bd',
-                backgroundColor: source === 'main' ? 'rgba(31, 119, 180, 0.2)' : source === 'previous' ? 'rgba(255, 127, 14, 0.2)' : source === 'compir' ? 'rgba(214, 39, 40, 0.2)' : source === 'previousCompir' ? 'rgba(44, 160, 44, 0.2)' : 'rgba(148, 103, 189, 0.2)',
-                fill: true
+                backgroundColor: source === 'main' ? 'rgba(31, 119, 180, 0.2)' : source === 'previous' ? 'rgba(255, 127, 14, 0.2)' : source === 'compir' ? 'rgba(214, 39, 40, 0.2)' : source === 'previousCompir' ? 'rgba(44, 160, 44, 0.2)' : 'rgba(148īn
+System: 148, 103, 189, 0.2)',
+                fill: true,
+                tension: 0.4,
+                pointRadius: 5,
+                pointHoverRadius: 8
             }));
+
             if (chartInstance) chartInstance.destroy();
             chartInstance = new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: filteredData.map(d => isRealTime ? new Date(d.timestamp).toLocaleTimeString('fa-IR') : d.scenario),
+                    labels: finalData.map(d => isRealTime ? new Date(d.timestamp).toLocaleTimeString('en-US') : `Scenario ${d.scenario}`),
                     datasets
                 },
                 options: {
                     responsive: true,
+                    interaction: {
+                        mode: 'nearest',
+                        intersect: true
+                    },
                     plugins: {
-                        title: { display: true, text: isRealTime ? 'پهنای باند بلادرنگ رادار (ایران)' : 'پهنای باند شبیه‌سازی', color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748' },
-                        legend: { position: 'top', labels: { color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748' } }
+                        title: {
+                            display: true,
+                            text: isRealTime ? 'Real-Time Throughput (Iran)' : 'Simulation Throughput',
+                            color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748',
+                            font: { size: 18 }
+                        },
+                        legend: {
+                            position: 'top',
+                            labels: { color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748' }
+                        },
+                        tooltip: {
+                            enabled: false,
+                            external: (context) => {
+                                const tooltipEl = document.getElementById('chartTooltip');
+                                if (!context.tooltip.opacity) {
+                                    tooltipEl.style.opacity = 0;
+                                    return;
+                                }
+                                const { chart, tooltip } = context;
+                                const position = chart.canvas.getBoundingClientRect();
+                                tooltipEl.style.opacity = 1;
+                                tooltipEl.style.left = `${position.left + window.pageXOffset + tooltip.caretX}px`;
+                                tooltipEl.style.top = `${position.top + window.pageYOffset + tooltip.caretY}px`;
+                                tooltipEl.innerHTML = `
+                                    <strong>${tooltip.dataPoints[0].dataset.label}</strong><br>
+                                    Time: ${tooltip.dataPoints[0].label}<br>
+                                    Throughput: ${tooltip.dataPoints[0].raw.toFixed(2)} Mbps
+                                `;
+                            }
+                        }
                     },
                     scales: {
-                        x: { title: { display: true, text: isRealTime ? 'زمان' : 'سناریو #', color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748' }, ticks: { color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748' } },
-                        y: { title: { display: true, text: 'پهنای باند (Mbps)', color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748' }, ticks: { color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748' }, beginAtZero: true }
+                        x: {
+                            title: { display: true, text: isRealTime ? 'Time' : 'Scenario #', color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748' },
+                            ticks: { color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748', maxRotation: 45, minRotation: 45 }
+                        },
+                        y: {
+                            title: { display: true, text: 'Throughput (Mbps)', color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748' },
+                            ticks: { color: document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748' },
+                            beginAtZero: true
+                        }
                     }
                 }
             });
@@ -275,11 +509,13 @@
             // Table
             const tbody = document.getElementById('metricsBody');
             tbody.innerHTML = '';
-            filteredData.slice(0, 10).forEach(row => {
+            finalData.slice(0, 10).forEach((row, index) => {
                 const tr = document.createElement('tr');
                 tr.className = 'table-row';
+                tr.tabIndex = 0;
+                tr.setAttribute('aria-rowindex', index + 1);
                 tr.innerHTML = `
-                    <td class="border border-gray-600 p-2">${new Date(row.timestamp).toLocaleString('fa-IR')}</td>
+                    <td class="border border-gray-600 p-2">${new Date(row.timestamp).toLocaleString('en-US')}</td>
                     <td class="border border-gray-600 p-2">${row.avg_throughput_mbps.toFixed(2)}</td>
                     <td class="border border-gray-600 p-2">${row.avg_latency_ms.toFixed(2)}</td>
                     <td class="border border-gray-600 p-2">${(row.drop_rate * 100).toFixed(2)}%</td>
@@ -289,19 +525,32 @@
                 anime({
                     targets: tr,
                     translateY: [20, 0],
-                    opacity: [0, ascended
-
-System: 1],
+                    opacity: [0, 1],
                     duration: 500,
-                    easing: 'easeOutQuad'
+                    easing: 'easeOutQuad',
+                    delay: index * 100
                 });
             });
 
+            // Accessibility: Keyboard navigation for table rows
+            const tableRows = document.querySelectorAll('.table-row');
+            tableRows.forEach(row => {
+                row.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        row.focus();
+                    }
+                });
+            });
+        }
+
+        // Event Listeners
+        function setupEventListeners() {
             // Theme Toggle
             document.getElementById('themeToggle').addEventListener('click', () => {
                 document.body.classList.toggle('dark');
                 document.body.classList.toggle('light');
-                document.getElementById('themeToggle').innerText = document.body.classList.contains('dark') ? 'تغییر به تم روشن' : 'تغییر به تم تیره';
+                document.getElementById('themeToggle').innerText = document.body.classList.contains('dark') ? 'Switch to Light Theme' : 'Switch to Dark Theme';
                 if (chartInstance) {
                     chartInstance.options.plugins.title.color = document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748';
                     chartInstance.options.scales.x.title.color = document.body.classList.contains('dark') ? '#e2e8f0' : '#2d3748';
@@ -321,49 +570,69 @@ System: 1],
             });
 
             // Filter Data
-            document.getElementById('filterSource').addEventListener('change', () => {
-                renderChartAndTable(currentData);
-            });
+            document.getElementById('filterSource').addEventListener('change', () => renderChartAndTable(currentData));
+            document.getElementById('filterLatency').addEventListener('input', () => renderChartAndTable(currentData));
 
             // Refresh Button
             document.getElementById('refreshData').addEventListener('click', () => initDashboard(0));
 
-            // Initialize Dashboard
-            async function initDashboard(retryCount = 0) {
-                if (retryCount >= 3) {
-                    document.getElementById('realTimeStatus').innerText = 'وضعیت: حداکثر تلاش‌ها انجام شد. استفاده از داده‌های محلی...';
-                    const jsonData = await fetchLocalJson();
-                    if (jsonData && jsonData.length) {
-                        renderChartAndTable(jsonData);
-                        return;
-                    }
-                    const csvData = await loadSimulationData();
-                    if (csvData && csvData.length) renderChartAndTable(csvData);
+            // Export CSV
+            document.getElementById('exportCsv').addEventListener('click', () => exportToCsv(currentData));
+
+            // Close Modal
+            document.getElementById('closeModal').addEventListener('click', closeModal);
+
+            // Keyboard Accessibility for Modal
+            document.getElementById('closeModal').addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    closeModal();
+                }
+            });
+        }
+
+        // Initialize Dashboard
+        async function initDashboard(retryCount = 0) {
+            if (retryCount >= 3) {
+                document.getElementById('realTimeStatus').innerText = 'Status: Max retries reached. Using local data...';
+                const jsonData = await fetchLocalJson();
+                if (jsonData && jsonData.length) {
+                    renderChartAndTable(jsonData);
                     return;
                 }
-                const tokenValid = await verifyToken();
-                let data = tokenValid ? await fetchRadarData() : null;
-                if (!data || data.length === 0) {
-                    data = await fetchLocalJson();
-                    if (!data || data.length === 0) {
-                        data = await loadSimulationData();
-                    }
-                }
-                if (data.length) renderChartAndTable(data);
-                setTimeout(() => initDashboard(retryCount + 1), 60000); // Increased to 60s to avoid rate limits
+                const csvData = await loadSimulationData();
+                if (csvData && csvData.length) renderChartAndTable(csvData);
+                return;
             }
 
-            // Anime.js Title Animation
-            anime({
-                targets: '.animate-title',
-                scale: [0.8, 1],
-                opacity: [0, 1],
-                duration: 1000,
-                easing: 'easeOutElastic(1, .6)'
-            });
+            const tokenValid = await verifyToken();
+            let data = tokenValid ? await fetchRadarData() : null;
+            if (!data || data.length === 0) {
+                data = await fetchLocalJson();
+                if (!data || data.length === 0) {
+                    data = await loadSimulationData();
+                }
+            }
+            if (data.length) renderChartAndTable(data);
 
-            // Kickoff
-            initDashboard();
-        </script>
-    </body>
+            // Initialize WebSocket if token is valid
+            if (tokenValid && !ws) initWebSocket();
+
+            setTimeout(() => initDashboard(retryCount + 1), 60000);
+        }
+
+        // Anime.js Title Animation
+        anime({
+            targets: '.animate-title',
+            scale: [0.8, 1],
+            opacity: [0, 1],
+            duration: 1000,
+            easing: 'easeOutElastic(1, .6)'
+        });
+
+        // Kickoff
+        setupEventListeners();
+        initDashboard();
+    </script>
+</body>
 </html>
